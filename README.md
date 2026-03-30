@@ -34,6 +34,7 @@
 | 汾沁精英库 | 111.0°E–113.0°E | 34.6°N–37.0°N | 橙灰 |
 | 泰沂精英库 | 116.0°E–119.6°E | 34.8°N–37.0°N | 紫 |
 | 胶东精英库 | 119.6°E–122.8°E | 35.5°N–38.5°N | 蓝 |
+| 阴山精英库 | 108.5°E–111.0°E | 40.2°N–42.2°N | 黄褐 |
 
 精英库生成流程：
 1. **GEE 提取**（`_relief_map_without_input.js`）：基于 JAXA ALOS AW3D30 V4.1 高程模型，在各研究区域内动态提取局部极大值点，计算各采样半径下的高差排名，按显著性阈值初步过滤
@@ -154,6 +155,7 @@ peaks/
   output_fenqin_elites_geojson/            汾沁精英库
   output_taiyi_elites_geojson/             泰沂精英库
   output_jiaodong_elites_geojson/          胶东精英库
+  output_yinshan_elites_geojson/           阴山精英库
 ```
 
 每个 `output_*` 目录包含：
@@ -174,3 +176,4 @@ peaks/
 - 地形计算平台：[Google Earth Engine](https://earthengine.google.com/)
 - 地图底图及地形数据：[MapTiler](https://www.maptiler.com/)
 - API 代理服务：[Cloudflare Workers](https://workers.cloudflare.com/)
+- AI辅助理论探索及编程服务：[Claude](https://claude.ai/)[Gemini](https://aistudio.google.com/)
