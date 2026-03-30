@@ -174,7 +174,7 @@ peaks/
 - 感谢所有热爱山峰量化研究的学者与爱好者，正是这一群体的持续探索推动了地形显著度研究的发展。
 - 感谢Github贡献者Apiaceae的开源项目[geocoder](https://github.com/Apiaceae/geocoder)，为部分无名峰的真实山名修正提供了数据参考。
 - 感谢[高德地图](https://www.amap.com/)、[天地图](https://map.tianditu.gov.cn/)在网页上提供的可供浏览查询的山峰地名数据，为部分无名峰的真实山名修正提供了参考。
-- 感谢两步路[https://www.2bulu.com/]、六只脚[https://www.foooooot.com/]上各位驴友提供的轨迹及标注点数据，为部分无名峰的真实山名修正提供了参考。
+- 感谢[两步路](https://www.2bulu.com/)、[六只脚](https://www.foooooot.com/)上各位驴友提供的轨迹及标注点数据，为部分无名峰的真实山名修正提供了参考。
 - 高程数据来源：[JAXA ALOS AW3D30 V4.1](https://www.eorc.jaxa.jp/ALOS/en/dataset/aw3d30/aw3d30_e.htm)
 - 地形计算平台：[Google Earth Engine](https://earthengine.google.com/)
 - 地图底图及地形数据：[MapTiler](https://www.maptiler.com/)
