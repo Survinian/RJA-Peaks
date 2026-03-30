@@ -362,6 +362,11 @@ canvas.jc{width:100% !important;height:160px !important}
         <div><span class="ds-name">胶东精英库</span><span class="ds-cnt" id="cnt-jiaodong_elite"></span></div></div>
       <label class="sw"><input type="checkbox" id="tog-jiaodong_elite"><span class="sw-t"></span></label>
     </div>
+    <div class="ds-row">
+      <div class="ds-l"><div class="ds-dot" style="background:#c8a84b;color:#c8a84b"></div>
+        <div><span class="ds-name">阴山精英库</span><span class="ds-cnt" id="cnt-yinshan_elite"></span></div></div>
+      <label class="sw"><input type="checkbox" id="tog-yinshan_elite"><span class="sw-t"></span></label>
+    </div>
 
     <!-- 新地区行示例（取消注释即可启用）
     <div class="ds-row">
@@ -427,6 +432,7 @@ canvas.jc{width:100% !important;height:160px !important}
       <div class="leg-row"><div class="ds-dot" style="background:#a0714f;color:#a0714f"></div><span>汾沁精英库（深青色系）</span></div>
       <div class="leg-row"><div class="ds-dot" style="background:#7c3aed;color:#7c3aed"></div><span>泰沂精英库（草绿色系）</span></div>
       <div class="leg-row"><div class="ds-dot" style="background:#2563eb;color:#2563eb"></div><span>胶东精英库（天蓝色系）</span></div>
+      <div class="leg-row"><div class="ds-dot" style="background:#c8a84b;color:#c8a84b"></div><span>阴山精英库（黄褐色系）</span></div>
       <div class="leg-row"><div class="ds-dot" style="background:#40c9a2;color:#40c9a2"></div><span>北京周边库（蓝→绿）</span></div>
       <div class="leg-row"><div class="ds-dot" style="background:#a78bfa;color:#a78bfa"></div><span>百里溪库（紫色系）</span></div>
 
@@ -476,7 +482,7 @@ canvas.jc{width:100% !important;height:160px !important}
 </div>
 
 <!-- ══ 右侧：距离段筛选 ══ -->
-<div class="panel" id="bp-panel" style="top:18px;right:18px;width:242px">
+<div class="panel" id="bp-panel" style="top:18px;right:18px;width:242px;max-height:calc(100vh - 120px);display:flex;flex-direction:column">
   <div class="panel-hd">
     <div class="bp-hd-row">
       <div>
@@ -492,7 +498,7 @@ canvas.jc{width:100% !important;height:160px !important}
       <div class="metric-btn"    id="mbt-ats"    onclick="setBandMetric('ats')">ATS</div>
     </div>
   </div>
-  <div class="panel-body">
+  <div class="panel-body" style="flex:1;overflow-y:auto">
 
     <!-- 阈值区（移到顶部，更直观）-->
     <div class="thr-row" style="margin-top:0;padding-top:0;border-top:none;margin-bottom:8px;padding-bottom:7px;border-bottom:1px solid rgba(90,140,220,.1)">
@@ -594,6 +600,7 @@ const FILES = {
   fenqin_elite:        'peaks/output_fenqin_elites_geojson/peaks_fenqin_elites.geojson',
   taiyi_elite:         'peaks/output_taiyi_elites_geojson/peaks_taiyi_elites.geojson',
   jiaodong_elite:      'peaks/output_jiaodong_elites_geojson/peaks_jiaodong_elites.geojson',
+  yinshan_elite:       'peaks/output_yinshan_elites_geojson/peaks_yinshan_elites.geojson',
   beijing:             'peaks/output_beijing_geojson/peaks_beijing.geojson',
   bailixi:             'peaks/output_bailixi_geojson/peaks_bailixi.geojson',
 };
@@ -611,6 +618,7 @@ const DS_LABEL = {
   fenqin_elite:         '汾沁精英库',
   taiyi_elite:         '泰沂精英库',
   jiaodong_elite:         '胶东精英库',
+  yinshan_elite:          '阴山精英库',
   beijing:             '北京周边库',
   bailixi:             '百里溪库',
 };
@@ -628,13 +636,14 @@ const DS_COLOR = {
   fenqin_elite:          '#a0714f',
   taiyi_elite:           '#7c3aed',
   jiaodong_elite:        '#2563eb',
+  yinshan_elite:         '#c8a84b',
   beijing:               '#40c9a2',
   bailixi:               '#a78bfa',
 };
 const DS_ZORDER = {
   elite:13, jidong_elite:12, xuanda_elite:11, zhongtaihang_elite:10, nantaihang_elite:9,
   chahar_elite:8, yanba_elite:7, chifeng_elite:6, suishuo_elite:5, lvliangshan_elite:4,
-  fenqin_elite:3, taiyi_elite:2, jiaodong_elite:1,
+  fenqin_elite:3, taiyi_elite:2, jiaodong_elite:1, yinshan_elite:0,
   beijing:3, bailixi:2,
 };
 
@@ -652,10 +661,32 @@ const COL = {
   fenqin_elite:        ['interpolate',['linear'],['get','rp'],0,'hsl(28,48%,64%)',0.5,'hsl(24,40%,50%)',1,'hsl(20,32%,36%)'],
   taiyi_elite:         ['interpolate',['linear'],['get','rp'],0,'hsl(272,52%,65%)',0.5,'hsl(268,44%,50%)',1,'hsl(264,38%,36%)'],
   jiaodong_elite:      ['interpolate',['linear'],['get','rp'],0,'hsl(214,88%,68%)',0.5,'hsl(218,78%,52%)',1,'hsl(222,70%,38%)'],
+  yinshan_elite:       ['interpolate',['linear'],['get','rp'],0,'hsl(42,80%,65%)',0.5,'hsl(38,72%,50%)',1,'hsl(34,65%,36%)'],
   beijing:             ['interpolate',['linear'],['get','rp'],0,'hsl(220,80%,60%)',0.4,'hsl(165,75%,50%)',0.7,'hsl(55,75%,50%)',1,'hsl(0,75%,50%)'],
   bailixi:             ['interpolate',['linear'],['get','rp'],0,'hsl(260,75%,70%)',0.5,'hsl(285,60%,55%)',1,'hsl(310,65%,45%)'],
 };
 const BAND_NAMES = ['极短距离','短距离','中短距离','中距离','中长距离','长距离','超长距离'];
+
+// 每个库对应的 Jut / EPR / Base 文件路径配置（提前声明，供预取使用）
+// 新增库时只需在此加一行
+const JUT_SOURCES = {
+  beijing:             { dir: 'peaks/output_beijing_geojson',              prefix: 'beijing' },
+  bailixi:             { dir: 'peaks/output_bailixi_geojson',              prefix: 'bailixi' },
+  elite:               { dir: 'peaks/output_beijing_around_elites_geojson',prefix: 'beijing_around_elites' },
+  jidong_elite:        { dir: 'peaks/output_jidong_elites_geojson',        prefix: 'jidong_elites' },
+  xuanda_elite:        { dir: 'peaks/output_xuanda_elites_geojson',        prefix: 'xuanda_elites' },
+  zhongtaihang_elite:  { dir: 'peaks/output_zhongtaihang_elites_geojson',  prefix: 'zhongtaihang_elites' },
+  nantaihang_elite:    { dir: 'peaks/output_nantaihang_elites_geojson',    prefix: 'nantaihang_elites' },
+  chahar_elite:        { dir: 'peaks/output_chahar_elites_geojson',          prefix: 'chahar_elites' },
+  yanba_elite:         { dir: 'peaks/output_yanba_elites_geojson',           prefix: 'yanba_elites' },
+  chifeng_elite:       { dir: 'peaks/output_chifeng_elites_geojson',         prefix: 'chifeng_elites' },
+  suishuo_elite:       { dir: 'peaks/output_suishuo_elites_geojson',         prefix: 'suishuo_elites' },
+  lvliangshan_elite:   { dir: 'peaks/output_lvliangshan_elites_geojson',     prefix: 'lvliangshan_elites' },
+  fenqin_elite:        { dir: 'peaks/output_fenqin_elites_geojson',          prefix: 'fenqin_elites' },
+  taiyi_elite:         { dir: 'peaks/output_taiyi_elites_geojson',           prefix: 'taiyi_elites' },
+  jiaodong_elite:      { dir: 'peaks/output_jiaodong_elites_geojson',        prefix: 'jiaodong_elites' },
+  yinshan_elite:       { dir: 'peaks/output_yinshan_elites_geojson',         prefix: 'yinshan_elites' },
+};
 
 const WORKER_URL = 'https://mapbox-proxy.18122920.workers.dev';
 
@@ -679,7 +710,7 @@ maptilersdk.config.fetch = window.fetch;
 let filterReliefPct = 0, filterJutPct = 0, filterAtsPct = 0; // 总体表现筛除（击败率下限，0=不筛）
 let filterMaxJutPct = 0, filterMaxAtsPct = 0; // 峰值筛除（击败率下限，0=不筛）
 let hideWildcard = false; // 隐藏外卡通道山峰
-const ELITE_DS = new Set(['elite','jidong_elite','xuanda_elite','zhongtaihang_elite','nantaihang_elite','chahar_elite','yanba_elite','chifeng_elite','suishuo_elite','lvliangshan_elite','fenqin_elite','taiyi_elite','jiaodong_elite']);
+const ELITE_DS = new Set(['elite','jidong_elite','xuanda_elite','zhongtaihang_elite','nantaihang_elite','chahar_elite','yanba_elite','chifeng_elite','suishuo_elite','lvliangshan_elite','fenqin_elite','taiyi_elite','jiaodong_elite','yinshan_elite']);
 let dotSize = 5, labelsOn = true;
 let activePopup = null, chartInstances = {};
 let activeBands = new Set(), bandMode = 'any', bandThr = 0.15;
@@ -693,21 +724,65 @@ let eprOpacity = 0.35;   // 等效突出半径圆透明度
 let baseOpacity = 0.25;  // 等效基座半径圆透明度
 let dsCircleNames = {};  // ds -> Set<name>，各库圆层山峰名集合
 
-// ── 加载进度 ──────────────────────────────────────────────────
-let loadedCnt = 0;
-const TOTAL_FILES = Object.keys(FILES).length + 2; // +3: jut 合集×1 + 等效半径合集×1
-function tick(msg){
-  loadedCnt++;
-  document.getElementById('ld-b').style.width=(loadedCnt/TOTAL_FILES*100)+'%';
-  document.getElementById('ld-msg').textContent=msg;
-  if(loadedCnt>=TOTAL_FILES) setTimeout(()=>{
-    const el=document.getElementById('loading');
-    el.style.opacity='0'; setTimeout(()=>el.remove(),500);
-  },300);
+// ══════════════════════════════════════════════════════════════════
+// 异步预取：页面脚本执行时立刻并发请求所有数据，与底图加载并行
+// ══════════════════════════════════════════════════════════════════
+
+// ── 进度追踪 ──────────────────────────────────────────────────────
+// 总任务数 = 主峰文件数 + Jut库数（每库视为1个任务）
+const DS_KEYS  = Object.keys(FILES);
+const JUT_KEYS = Object.keys(JUT_SOURCES);
+const TOTAL_TASKS = DS_KEYS.length + JUT_KEYS.length;
+let   doneTasks   = 0;
+
+function tick(msg) {
+  doneTasks = Math.min(doneTasks + 1, TOTAL_TASKS);
+  const pct = doneTasks / TOTAL_TASKS * 100;
+  const bar = document.getElementById('ld-b');
+  if (bar) bar.style.width = pct + '%';
+  const sub = document.getElementById('ld-msg');
+  if (sub) sub.textContent = msg;
+  if (doneTasks >= TOTAL_TASKS) {
+    setTimeout(() => {
+      const el = document.getElementById('loading');
+      if (el) { el.style.opacity = '0'; setTimeout(() => el.remove(), 500); }
+    }, 300);
+  }
 }
 
+// ── 主峰数据：立刻并发请求，每个文件到达后 tick ──────────────────
+// Promise 在页面脚本执行时就发出，不等地图 load
+const prefetchedPeaks = Promise.all(
+  Object.entries(FILES).map(([ds, url]) =>
+    fetch(url)
+      .then(r => { if (!r.ok) throw new Error(r.status); return r.json(); })
+      .then(d  => { tick(`已加载 ${DS_LABEL[ds]}`); return { ds, d }; })
+      .catch(e => {
+        console.warn(ds, e.message);
+        tick(`${DS_LABEL[ds]} 不可用`);
+        return { ds, d: { type: 'FeatureCollection', features: [] } };
+      })
+  )
+);
+
+// ── Jut/EPR/Base 数据：同样立刻并发，每库4个文件并发后合并为1个 tick
+const prefetchedJut = Promise.all(
+  JUT_KEYS.map(ds => {
+    const { dir, prefix } = JUT_SOURCES[ds];
+    return Promise.all([
+      fetch(`${dir}/${prefix}_jut_bases.geojson`).then(r=>r.json()).catch(()=>({type:'FeatureCollection',features:[]})),
+      fetch(`${dir}/${prefix}_jut_profiles.json`).then(r=>r.json()).catch(()=>({})),
+      fetch(`${dir}/${prefix}_epr_circles.geojson`).then(r=>r.json()).catch(()=>({type:'FeatureCollection',features:[]})),
+      fetch(`${dir}/${prefix}_base_circles.geojson`).then(r=>r.json()).catch(()=>({type:'FeatureCollection',features:[]})),
+    ]).then(([bases, profiles, epr, base]) => {
+      tick(`已加载 Jut·${DS_LABEL[ds] || ds}`);  // 每库只 tick 1次，与 TOTAL_TASKS 对应
+      return { ds, bases, profiles, epr, base };
+    });
+  })
+);
+
 // ══════════════════════════════════════════════════════════════════
-// 地图
+// 地图初始化（与数据预取并行进行）
 // ══════════════════════════════════════════════════════════════════
 const map = new maptilersdk.Map({
   container: 'map',
@@ -722,8 +797,8 @@ const map = new maptilersdk.Map({
     return { url };
   },
 });
-map.addControl(new maptilersdk.NavigationControl(), 'top-right');
-map.addControl(new maptilersdk.ScaleControl({unit: 'metric'}), 'bottom-right');
+map.addControl(new maptilersdk.NavigationControl(), 'bottom-right');
+map.addControl(new maptilersdk.ScaleControl({unit: 'metric'}), 'bottom-left');
 
 // 综合筛除过滤器（三个总体表现，任一满足即显示；全为0则不筛）
 function makeOverallFilter(){
@@ -742,84 +817,83 @@ function makeOverallFilter(){
 function rpFilter(){ return makeOverallFilter(); }
 function dotR(sz){return['interpolate',['linear'],['zoom'],5,sz*.45,9,sz,14,sz*1.7]}
 
-map.on('load',()=>{
-  // 地形DEM：tiles模板URL需要直接请求（Worker不处理模板URL）
-  // 通过fetch拦截器自动走Worker代理
-  map.addSource('dem',{
-    type:'raster-dem',
-    tiles:[`${WORKER_URL}/proxy/api.maptiler.com/tiles/terrain-rgb-v2/{z}/{x}/{y}.webp`],
-    tileSize:256,
-    maxzoom:14,
-    attribution:'© MapTiler'
+// 地图与数据同时在跑，用 Promise.all 等两者都就绪后再上图
+// mapReady 是一个在 map.on('load') 时 resolve 的 Promise
+const mapReady = new Promise(resolve => map.on('load', resolve));
+
+// 地图底图加载完毕后立刻挂 DEM（不依赖数据）
+mapReady.then(() => {
+  map.addSource('dem', {
+    type: 'raster-dem',
+    tiles: [`${WORKER_URL}/proxy/api.maptiler.com/tiles/terrain-rgb-v2/{z}/{x}/{y}.webp`],
+    tileSize: 256, maxzoom: 14, attribution: '© MapTiler'
   });
-  map.setTerrain({source:'dem',exaggeration:1.4});
-  // sky图层在MapTiler SDK v2中不支持，已移除
+  map.setTerrain({ source: 'dem', exaggeration: 1.4 });
+});
 
-  const order = Object.keys(DS_ZORDER).sort((a,b)=>DS_ZORDER[a]-DS_ZORDER[b]);
+// 主峰数据 + 地图底图，两者都就绪后上图并初始化控件
+Promise.all([mapReady, prefetchedPeaks]).then(([, results]) => {
+  const order = Object.keys(DS_ZORDER).sort((a, b) => DS_ZORDER[a] - DS_ZORDER[b]);
 
-  Promise.all(Object.entries(FILES).map(([ds,url])=>
-    fetch(url)
-      .then(r=>{if(!r.ok)throw new Error(r.status);return r.json();})
-      .then(d=>{tick(`已加载 ${DS_LABEL[ds]}`);return{ds,d};})
-      .catch(e=>{console.warn(ds,e.message);tick(`${DS_LABEL[ds]} 不可用`);return{ds,d:{type:'FeatureCollection',features:[]}};})
-  )).then(results=>{
-    results.forEach(({ds,d})=>{
-      allData[ds]=d;
-      const el=document.getElementById(`cnt-${ds}`);
-      if(el&&d.features.length) el.textContent=`(${d.features.length.toLocaleString()})`;
-      // 建检索索引
-      d.features.forEach(f=>{
-        const p=f.properties;
-        searchIndex.push({
-          name: p.name||'',
-          search_name: p.search_name||p.name||'',
-          source: ds,
-          lon: f.geometry.coordinates[0],
-          lat: f.geometry.coordinates[1],
-          elev: p.elev,
-          props: p,
-        });
+  results.forEach(({ ds, d }) => {
+    allData[ds] = d;
+    const el = document.getElementById(`cnt-${ds}`);
+    if (el && d.features.length) el.textContent = `(${d.features.length.toLocaleString()})`;
+    d.features.forEach(f => {
+      const p = f.properties;
+      searchIndex.push({
+        name: p.name || '',
+        search_name: p.search_name || p.name || '',
+        source: ds, lon: f.geometry.coordinates[0],
+        lat: f.geometry.coordinates[1], elev: p.elev, props: p,
       });
     });
-
-    order.forEach(ds=>{
-      const togOn=document.getElementById(`tog-${ds}`).checked;
-      map.addSource(`s-${ds}`,{type:'geojson',data:allData[ds]});
-      map.addLayer({id:`dot-${ds}`,type:'circle',source:`s-${ds}`,
-        layout:{visibility:togOn?'visible':'none'},
-        filter:rpFilter()||true,
-        paint:{
-          'circle-radius':dotR(dotSize),
-          'circle-color':COL[ds],
-          'circle-stroke-width':['interpolate',['linear'],['zoom'],6,.5,11,1.2],
-          'circle-stroke-color':'rgba(255,255,255,.28)',
-          'circle-opacity':['interpolate',['linear'],['get','rp'],0,1,1,.72],
-        }
-      });
-      map.addLayer({id:`lbl-${ds}`,type:'symbol',source:`s-${ds}`,
-        layout:{visibility:(togOn&&labelsOn)?'visible':'none',
-          'text-field':['get','name'],
-          'text-font':['Open Sans Bold','Arial Unicode MS Bold'],
-          'text-size':['interpolate',['linear'],['zoom'],8,9,12,12,14,13],
-          'text-offset':[0,1.1],'text-anchor':'top',
-          'text-allow-overlap':false,'text-optional':true},
-        filter:rpFilter()||true,minzoom:8,
-        paint:{'text-color':DS_COLOR[ds],'text-halo-color':'rgba(5,10,22,.9)','text-halo-width':2}
-      });
-      map.on('mouseenter',`dot-${ds}`,()=>map.getCanvas().style.cursor='pointer');
-      map.on('mouseleave',`dot-${ds}`,()=>map.getCanvas().style.cursor='');
-      map.on('click',`dot-${ds}`,e=>{e.preventDefault();showPopup(e.features[0].properties,e.features[0].geometry.coordinates,ds);});
-    });
-    [...order].reverse().forEach(ds=>{
-      if(map.getLayer(`dot-${ds}`)) map.moveLayer(`dot-${ds}`);
-      if(map.getLayer(`lbl-${ds}`)) map.moveLayer(`lbl-${ds}`);
-    });
-
-    setupControls();
-    setupSearch();
-    // Load jut data after main peaks
-    loadJutData();
   });
+
+  order.forEach(ds => {
+    const togOn = document.getElementById(`tog-${ds}`).checked;
+    map.addSource(`s-${ds}`, { type: 'geojson', data: allData[ds] });
+    map.addLayer({
+      id: `dot-${ds}`, type: 'circle', source: `s-${ds}`,
+      layout: { visibility: togOn ? 'visible' : 'none' },
+      filter: rpFilter() || true,
+      paint: {
+        'circle-radius': dotR(dotSize),
+        'circle-color': COL[ds],
+        'circle-stroke-width': ['interpolate',['linear'],['zoom'],6,.5,11,1.2],
+        'circle-stroke-color': 'rgba(255,255,255,.28)',
+        'circle-opacity': ['interpolate',['linear'],['get','rp'],0,1,1,.72],
+      }
+    });
+    map.addLayer({
+      id: `lbl-${ds}`, type: 'symbol', source: `s-${ds}`,
+      layout: {
+        visibility: (togOn && labelsOn) ? 'visible' : 'none',
+        'text-field': ['get','name'],
+        'text-font': ['Open Sans Bold','Arial Unicode MS Bold'],
+        'text-size': ['interpolate',['linear'],['zoom'],8,9,12,12,14,13],
+        'text-offset': [0,1.1], 'text-anchor': 'top',
+        'text-allow-overlap': false, 'text-optional': true,
+      },
+      filter: rpFilter() || true, minzoom: 8,
+      paint: { 'text-color': DS_COLOR[ds], 'text-halo-color': 'rgba(5,10,22,.9)', 'text-halo-width': 2 }
+    });
+    map.on('mouseenter', `dot-${ds}`, () => map.getCanvas().style.cursor = 'pointer');
+    map.on('mouseleave', `dot-${ds}`, () => map.getCanvas().style.cursor = '');
+    map.on('click', `dot-${ds}`, e => {
+      e.preventDefault();
+      showPopup(e.features[0].properties, e.features[0].geometry.coordinates, ds);
+    });
+  });
+
+  [...order].reverse().forEach(ds => {
+    if (map.getLayer(`dot-${ds}`)) map.moveLayer(`dot-${ds}`);
+    if (map.getLayer(`lbl-${ds}`)) map.moveLayer(`lbl-${ds}`);
+  });
+
+  setupControls();
+  setupSearch();
+  loadJutData();
 });
 
 // ══════════════════════════════════════════════════════════════════
@@ -937,52 +1011,15 @@ function clearSearch(){
 // Jut 数据加载 & 图层
 // ══════════════════════════════════════════════════════════════════
 
-// 每个库对应的 Jut / EPR / Base 文件路径配置
-// 新增库时只需在此加一行
-const JUT_SOURCES = {
-  beijing:             { dir: 'peaks/output_beijing_geojson',              prefix: 'beijing' },
-  bailixi:             { dir: 'peaks/output_bailixi_geojson',              prefix: 'bailixi' },
-  elite:               { dir: 'peaks/output_beijing_around_elites_geojson',prefix: 'beijing_around_elites' },
-  jidong_elite:        { dir: 'peaks/output_jidong_elites_geojson',        prefix: 'jidong_elites' },
-  xuanda_elite:        { dir: 'peaks/output_xuanda_elites_geojson',        prefix: 'xuanda_elites' },
-  zhongtaihang_elite:  { dir: 'peaks/output_zhongtaihang_elites_geojson',  prefix: 'zhongtaihang_elites' },
-  nantaihang_elite:    { dir: 'peaks/output_nantaihang_elites_geojson',    prefix: 'nantaihang_elites' },
-  chahar_elite:        { dir: 'peaks/output_chahar_elites_geojson',          prefix: 'chahar_elites' },
-  yanba_elite:         { dir: 'peaks/output_yanba_elites_geojson',           prefix: 'yanba_elites' },
-  chifeng_elite:       { dir: 'peaks/output_chifeng_elites_geojson',         prefix: 'chifeng_elites' },
-  suishuo_elite:         { dir: 'peaks/output_suishuo_elites_geojson', prefix: 'suishuo_elites' },
-  lvliangshan_elite:         { dir: 'peaks/output_lvliangshan_elites_geojson', prefix: 'lvliangshan_elites' },
-  fenqin_elite:         { dir: 'peaks/output_fenqin_elites_geojson', prefix: 'fenqin_elites' },
-  taiyi_elite:         { dir: 'peaks/output_taiyi_elites_geojson', prefix: 'taiyi_elites' },
-  jiaodong_elite:         { dir: 'peaks/output_jiaodong_elites_geojson', prefix: 'jiaodong_elites' },
-};
-
 function loadJutData(){
-  // 动态构建所有 fetch
-  const dsKeys = Object.keys(JUT_SOURCES);
-  const fetches = dsKeys.flatMap(ds => {
-    const {dir, prefix} = JUT_SOURCES[ds];
-    return [
-      fetch(`${dir}/${prefix}_jut_bases.geojson`).then(r=>r.json()).catch(()=>({type:'FeatureCollection',features:[]})),
-      fetch(`${dir}/${prefix}_jut_profiles.json`).then(r=>r.json()).catch(()=>({})),
-      fetch(`${dir}/${prefix}_epr_circles.geojson`).then(r=>r.json()).catch(()=>({type:'FeatureCollection',features:[]})),
-      fetch(`${dir}/${prefix}_base_circles.geojson`).then(r=>r.json()).catch(()=>({type:'FeatureCollection',features:[]})),
-    ];
-  });
-
-  Promise.all(fetches).then(results => {
-    // 每组4个: bases, profiles, epr, base
+  // Jut 文件已在页面启动时并发预取（prefetchedJut），此处直接等待结果，无重复请求
+  prefetchedJut.then(allResults => {
     const allBases = {type:'FeatureCollection', features:[]};
     const allProfiles = {};
     const allEpr   = {type:'FeatureCollection', features:[]};
     const allBase  = {type:'FeatureCollection', features:[]};
 
-    dsKeys.forEach((ds, i) => {
-      const basesGeo  = results[i*4];
-      const profiles  = results[i*4+1];
-      const eprGeo    = results[i*4+2];
-      const baseGeo   = results[i*4+3];
-
+    allResults.forEach(({ ds, bases: basesGeo, profiles, epr: eprGeo, base: baseGeo }) => {
       // 给每个 feature 打上 ds 标签，实现按数据集开关
       const tag = feats => feats.map(f => ({
         ...f,
@@ -1046,7 +1083,6 @@ function loadJutData(){
       });
     })(allBases.features, 30);
     // ────────────────────────────────────────────────────────────
-    tick('已加载 Jut观测点（全部合集）');
 
     // ── 1. Jut Base Points Layer ───────────────────────────────
     map.addSource('s-jut-base', {type:'geojson', data: allBases});
@@ -1089,7 +1125,6 @@ function loadJutData(){
     buildEprLayer(allEpr);
     // ── 3. Base Circles ─────────────────────────────────────────
     buildBaseCircleLayer(allBase);
-    tick('已加载 等效突出半径（合并）');
 
     // 初始化各数据集开关对圆的联动
     updateCircleDsFilter();
@@ -2183,6 +2218,7 @@ const DS_CONFIG = {
   fenqin_elite:      { label:'汾沁精英库',   color:'#a0714f' },
   taiyi_elite:      { label:'泰沂精英库',   color:'#7c3aed' },
   jiaodong_elite:      { label:'胶东精英库',   color:'#2563eb' },
+  yinshan_elite:       { label:'阴山精英库',   color:'#c8a84b' },
 };
 
 let statsChart = null;
