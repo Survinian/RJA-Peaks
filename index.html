@@ -12,6 +12,27 @@
 *,*::before,*::after{box-sizing:border-box}
 body{margin:0;padding:0;font-family:-apple-system,"Noto Sans SC",sans-serif;overflow:hidden;background:#090f1c}
 #map{position:absolute;top:0;bottom:0;width:100%}
+:root{
+  --bp-panel-right:18px;
+  --bp-panel-width:242px;
+  --ctrl-safe-gap:14px;
+  --right-panel-avoid:calc(var(--bp-panel-right) + var(--bp-panel-width) + var(--ctrl-safe-gap));
+}
+
+/* 右侧筛选面板避让：避免与地图右侧控件（缩放/罗盘）遮挡 */
+.mapboxgl-ctrl-top-right,.maptilergl-ctrl-top-right,.maplibregl-ctrl-top-right,
+.mapboxgl-ctrl-bottom-right,.maptilergl-ctrl-bottom-right,.maplibregl-ctrl-bottom-right{
+  right:var(--right-panel-avoid) !important;
+}
+
+@media (max-width:1100px){
+  :root{
+    --bp-panel-right:18px;
+    --bp-panel-width:242px;
+    --ctrl-safe-gap:10px;
+    --right-panel-avoid:calc(var(--bp-panel-right) + var(--bp-panel-width) + var(--ctrl-safe-gap));
+  }
+}
 
 /* ══ 通用开关 ══ */
 .sw{position:relative;display:inline-block;width:36px;height:19px;flex-shrink:0}
