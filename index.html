@@ -736,144 +736,88 @@ let dotSize = 5, labelsOn = true;
 let activePopup = null, chartInstances = {};
 let activeBands = new Set(), bandMode = 'any', bandThr = 0.15;
 let bandMetric = 'relief';  // 'relief' | 'jut' | 'ats'
-let allData = {};            // ds -> FeatureCollection
+let allData = {};            // ds -> FeatureCollection（仅已加载）
 let searchIndex = [];        // [{name,source,lon,lat,elev,props}]
-let jutProfiles = {};        // name -> {radii,mean_juts,max_juts,...}
+let jutProfiles = {};        // ds -> profile json
 let eprData = {};            // name -> {max_mean_jut, eq_radius, rank, rank_pct}
-let baseCircleData = {};    // name -> {r_base, max_ats, rank_pct}
-let eprOpacity = 0.35;   // 等效突出半径圆透明度
-let baseOpacity = 0.25;  // 等效基座半径圆透明度
-let dsCircleNames = {};  // ds -> Set<name>，各库圆层山峰名集合
+let baseCircleData = {};     // name -> {r_base, max_ats, rank_pct}
+let eprOpacity = 0.35;       // 等效突出半径圆透明度
+let baseOpacity = 0.25;      // 等效基座半径圆透明度
+let dsCircleNames = {};      // ds -> Set<name>
 
-// ══════════════════════════════════════════════════════════════════
-// 异步预取：页面脚本执行时立刻并发请求所有数据，与底图加载并行
-// ══════════════════════════════════════════════════════════════════
+const datasetLoadState = {}; // ds -> { loadingPromise }
+const jutLoadState = {};     // ds -> { loadingPromise, loaded, bases, profiles, epr, base }
+let loadingHidden = false;
+let mapReadyResolved = false;
 
-// ── 进度追踪 ──────────────────────────────────────────────────────
-// 总任务数 = 主峰文件数 + Jut库数（每库视为1个任务）
-const DS_KEYS  = Object.keys(FILES);
-const JUT_KEYS = Object.keys(JUT_SOURCES);
-const TOTAL_TASKS = DS_KEYS.length + JUT_KEYS.length;
-let   doneTasks   = 0;
-
-function tick(msg) {
-  doneTasks = Math.min(doneTasks + 1, TOTAL_TASKS);
-  const pct = doneTasks / TOTAL_TASKS * 100;
-  const bar = document.getElementById('ld-b');
-  if (bar) bar.style.width = pct + '%';
+function setLoadingState(msg, pct = null){
   const sub = document.getElementById('ld-msg');
-  if (sub) sub.textContent = msg;
-  if (doneTasks >= TOTAL_TASKS) {
-    setTimeout(() => {
-      const el = document.getElementById('loading');
-      if (el) { el.style.opacity = '0'; setTimeout(() => el.remove(), 500); }
-    }, 300);
+  if (sub && msg) sub.textContent = msg;
+  if (pct != null) {
+    const bar = document.getElementById('ld-b');
+    if (bar) bar.style.width = `${Math.max(0, Math.min(100, pct))}%`;
   }
 }
 
-// ── 主峰数据：立刻并发请求，每个文件到达后 tick ──────────────────
-// Promise 在页面脚本执行时就发出，不等地图 load
-const prefetchedPeaks = Promise.all(
-  Object.entries(FILES).map(([ds, url]) =>
-    fetch(url)
-      .then(r => { if (!r.ok) throw new Error(r.status); return r.json(); })
-      .then(d  => { tick(`已加载 ${DS_LABEL[ds]}`); return { ds, d }; })
-      .catch(e => {
-        console.warn(ds, e.message);
-        tick(`${DS_LABEL[ds]} 不可用`);
-        return { ds, d: { type: 'FeatureCollection', features: [] } };
-      })
-  )
-);
-
-// ── Jut/EPR/Base 数据：同样立刻并发，每库4个文件并发后合并为1个 tick
-const prefetchedJut = Promise.all(
-  JUT_KEYS.map(ds => {
-    const { dir, prefix } = JUT_SOURCES[ds];
-    return Promise.all([
-      fetch(`${dir}/${prefix}_jut_bases.geojson`).then(r=>r.json()).catch(()=>({type:'FeatureCollection',features:[]})),
-      fetch(`${dir}/${prefix}_jut_profiles.json`).then(r=>r.json()).catch(()=>({})),
-      fetch(`${dir}/${prefix}_epr_circles.geojson`).then(r=>r.json()).catch(()=>({type:'FeatureCollection',features:[]})),
-      fetch(`${dir}/${prefix}_base_circles.geojson`).then(r=>r.json()).catch(()=>({type:'FeatureCollection',features:[]})),
-    ]).then(([bases, profiles, epr, base]) => {
-      tick(`已加载 Jut·${DS_LABEL[ds] || ds}`);  // 每库只 tick 1次，与 TOTAL_TASKS 对应
-      return { ds, bases, profiles, epr, base };
-    });
-  })
-);
-
-// ══════════════════════════════════════════════════════════════════
-// 地图初始化（与数据预取并行进行）
-// ══════════════════════════════════════════════════════════════════
-const map = new maptilersdk.Map({
-  container: 'map',
-  style: WORKER_URL + '/proxy/api.maptiler.com/maps/outdoor-v2/style.json',
-  center: [116.2, 40.1], zoom: 9, pitch: 50, bearing: -6,
-  transformRequest: (url) => {
-    if (url.startsWith('https://api.maptiler.com')) {
-      const u = new URL(url);
-      u.searchParams.delete('key');
-      return { url: WORKER_URL + '/proxy/' + u.host + u.pathname + (u.search || '') };
-    }
-    return { url };
-  },
-});
-map.addControl(new maptilersdk.NavigationControl(), 'bottom-right');
-map.addControl(new maptilersdk.ScaleControl({unit: 'metric'}), 'bottom-left');
-
-// 综合筛除过滤器（三个总体表现，任一满足即显示；全为0则不筛）
-function makeOverallFilter(){
-  const rMin = filterReliefPct, jMin = filterJutPct, aMin = filterAtsPct;
-  const mjxMin = filterMaxJutPct, maxMin = filterMaxAtsPct;
-  if(rMin===0 && jMin===0 && aMin===0 && mjxMin===0 && maxMin===0) return null;
-  const conds = [];
-  if(rMin>0)   conds.push(['<=',['get','mean_relief_crp'], 1-rMin]);
-  if(jMin>0)   conds.push(['<=',['get','mean_jut_crp'],    1-jMin]);
-  if(aMin>0)   conds.push(['<=',['get','mean_ats_crp'],    1-aMin]);
-  if(mjxMin>0) conds.push(['<=',['get','max_jut_crp'],     1-mjxMin]);
-  if(maxMin>0) conds.push(['<=',['get','max_ats_crp'],     1-maxMin]);
-  if(conds.length===1) return conds[0];
-  return ['all',...conds];
+function hideLoading(){
+  if (loadingHidden) return;
+  loadingHidden = true;
+  const bar = document.getElementById('ld-b');
+  if (bar) bar.style.width = '100%';
+  const el = document.getElementById('loading');
+  if (!el) return;
+  setTimeout(() => {
+    el.style.opacity = '0';
+    setTimeout(() => el.remove(), 500);
+  }, 200);
 }
-function rpFilter(){ return makeOverallFilter(); }
-function dotR(sz){return['interpolate',['linear'],['zoom'],5,sz*.45,9,sz,14,sz*1.7]}
 
-// 地图与数据同时在跑，用 Promise.all 等两者都就绪后再上图
-// mapReady 是一个在 map.on('load') 时 resolve 的 Promise
-const mapReady = new Promise(resolve => map.on('load', resolve));
+function checkedDatasets(){
+  return Object.keys(FILES).filter(ds => document.getElementById(`tog-${ds}`)?.checked);
+}
 
-// 地图底图加载完毕后立刻挂 DEM（不依赖数据）
-mapReady.then(() => {
-  map.addSource('dem', {
-    type: 'raster-dem',
-    tiles: [`${WORKER_URL}/proxy/api.maptiler.com/tiles/terrain-rgb-v2/{z}/{x}/{y}.webp`],
-    tileSize: 256, maxzoom: 14, attribution: '© MapTiler'
-  });
-  map.setTerrain({ source: 'dem', exaggeration: 1.4 });
-});
+async function fetchJsonSafe(url, fallback){
+  try{
+    const r = await fetch(url);
+    if(!r.ok) throw new Error(String(r.status));
+    return await r.json();
+  }catch(err){
+    console.warn(url, err.message || err);
+    return fallback;
+  }
+}
 
-// 主峰数据 + 地图底图，两者都就绪后上图并初始化控件
-Promise.all([mapReady, prefetchedPeaks]).then(([, results]) => {
-  const order = Object.keys(DS_ZORDER).sort((a, b) => DS_ZORDER[a] - DS_ZORDER[b]);
-
-  results.forEach(({ ds, d }) => {
-    allData[ds] = d;
-    const el = document.getElementById(`cnt-${ds}`);
-    if (el && d.features.length) el.textContent = `(${d.features.length.toLocaleString()})`;
-    d.features.forEach(f => {
-      const p = f.properties;
-      searchIndex.push({
-        name: p.name || '',
-        search_name: p.search_name || p.name || '',
-        source: ds, lon: f.geometry.coordinates[0],
-        lat: f.geometry.coordinates[1], elev: p.elev, props: p,
-      });
+function addSearchIndexForDataset(ds, data){
+  const feats = Array.isArray(data?.features) ? data.features : [];
+  feats.forEach(f => {
+    const p = f.properties || {};
+    const coords = f.geometry?.coordinates || [];
+    searchIndex.push({
+      name: p.name || '',
+      search_name: p.search_name || p.name || '',
+      source: ds,
+      lon: coords[0],
+      lat: coords[1],
+      elev: p.elev,
+      props: p,
     });
   });
+}
 
-  order.forEach(ds => {
-    const togOn = document.getElementById(`tog-${ds}`).checked;
-    map.addSource(`s-${ds}`, { type: 'geojson', data: allData[ds] });
+function reorderDatasetLayers(){
+  const order = Object.keys(DS_ZORDER).sort((a, b) => DS_ZORDER[a] - DS_ZORDER[b]);
+  [...order].reverse().forEach(ds => {
+    if (map.getLayer(`dot-${ds}`)) map.moveLayer(`dot-${ds}`);
+    if (map.getLayer(`lbl-${ds}`)) map.moveLayer(`lbl-${ds}`);
+  });
+}
+
+function addDatasetToMap(ds){
+  const data = allData[ds] || { type:'FeatureCollection', features:[] };
+  const togOn = document.getElementById(`tog-${ds}`)?.checked;
+
+  if(!map.getSource(`s-${ds}`)){
+    map.addSource(`s-${ds}`, { type: 'geojson', data });
     map.addLayer({
       id: `dot-${ds}`, type: 'circle', source: `s-${ds}`,
       layout: { visibility: togOn ? 'visible' : 'none' },
@@ -905,18 +849,255 @@ Promise.all([mapReady, prefetchedPeaks]).then(([, results]) => {
       e.preventDefault();
       showPopup(e.features[0].properties, e.features[0].geometry.coordinates, ds);
     });
+  }else{
+    map.getSource(`s-${ds}`).setData(data);
+  }
+
+  reorderDatasetLayers();
+}
+
+async function ensureDatasetLoaded(ds, { withJut = true, silent = false } = {}){
+  if(allData[ds]){
+    if(withJut) await ensureJutDatasetLoaded(ds, { silent: true });
+    return allData[ds];
+  }
+  datasetLoadState[ds] ||= {};
+  if(!datasetLoadState[ds].loadingPromise){
+    if(!silent) setLoadingState(`正在加载 ${DS_LABEL[ds]}…`);
+    datasetLoadState[ds].loadingPromise = fetchJsonSafe(
+      FILES[ds],
+      { type:'FeatureCollection', features:[] }
+    ).then(async data => {
+      allData[ds] = data;
+      const el = document.getElementById(`cnt-${ds}`);
+      if(el) el.textContent = data.features?.length ? `(${data.features.length.toLocaleString()})` : '(0)';
+      addSearchIndexForDataset(ds, data);
+      if(mapReadyResolved) addDatasetToMap(ds);
+      if(withJut) await ensureJutDatasetLoaded(ds, { silent: true });
+      return data;
+    }).finally(() => {
+      datasetLoadState[ds].loadingPromise = null;
+    });
+  }
+  return datasetLoadState[ds].loadingPromise;
+}
+
+function spreadOverlappingBases(features, offsetM = 30) {
+  const groups = {};
+  features.forEach((f, i) => {
+    const [lon, lat] = f.geometry.coordinates;
+    const key = lon.toFixed(5) + ',' + lat.toFixed(5);
+    if (!groups[key]) groups[key] = [];
+    groups[key].push(i);
+  });
+  Object.values(groups).forEach(idxs => {
+    if (idxs.length < 2) return;
+    const [bLon, bLat] = features[idxs[0]].geometry.coordinates;
+    const cosLat = Math.cos(bLat * Math.PI / 180);
+    idxs.forEach(idx => {
+      const p = features[idx].properties;
+      const dx = (p.peak_lon - bLon) * 111000 * cosLat;
+      const dy = (p.peak_lat - bLat) * 111000;
+      const angle = Math.atan2(dy, dx);
+      features[idx].geometry.coordinates = [
+        bLon + offsetM * Math.cos(angle) / (111000 * cosLat),
+        bLat + offsetM * Math.sin(angle) / 111000,
+      ];
+    });
+  });
+}
+
+function rebuildLoadedJutLayers(){
+  const allBases = { type:'FeatureCollection', features:[] };
+  const allEpr   = { type:'FeatureCollection', features:[] };
+  const allBase  = { type:'FeatureCollection', features:[] };
+  const profiles = {};
+
+  eprData = {};
+  baseCircleData = {};
+  dsCircleNames = {};
+
+  Object.entries(jutLoadState).forEach(([ds, st]) => {
+    if(!st?.loaded) return;
+    profiles[ds] = st.profiles || {};
+    allBases.features.push(...(st.bases?.features || []));
+    allEpr.features.push(...(st.epr?.features || []));
+    allBase.features.push(...(st.base?.features || []));
   });
 
-  [...order].reverse().forEach(ds => {
-    if (map.getLayer(`dot-${ds}`)) map.moveLayer(`dot-${ds}`);
-    if (map.getLayer(`lbl-${ds}`)) map.moveLayer(`lbl-${ds}`);
+  jutProfiles = profiles;
+  allEpr.features.forEach(f => {
+    eprData[f.properties.name] = f.properties;
+    const ds = f.properties._ds;
+    if(!dsCircleNames[ds]) dsCircleNames[ds] = new Set();
+    dsCircleNames[ds].add(f.properties.name);
+  });
+  allBase.features.forEach(f => {
+    baseCircleData[f.properties.name] = f.properties;
+  });
+  allBases.features.forEach(f => {
+    const ds = f.properties._ds;
+    if(!dsCircleNames[ds]) dsCircleNames[ds] = new Set();
+    dsCircleNames[ds].add(f.properties.peak_name);
   });
 
-  setupControls();
-  setupSearch();
-  loadJutData();
+  spreadOverlappingBases(allBases.features, 30);
+
+  if(map.getSource('s-jut-base')){
+    map.getSource('s-jut-base').setData(allBases);
+  }else{
+    map.addSource('s-jut-base', {type:'geojson', data: allBases});
+    map.addLayer({
+      id:'dot-jut-base', type:'circle', source:'s-jut-base',
+      layout:{visibility: document.getElementById('tog-jut-base').checked?'visible':'none'},
+      paint:{
+        'circle-radius':['interpolate',['linear'],['zoom'],5,3,9,5,14,7],
+        'circle-color':'#40ffa0',
+        'circle-stroke-width':['interpolate',['linear'],['zoom'],6,.8,11,1.4],
+        'circle-stroke-color':'rgba(0,50,30,.8)',
+        'circle-opacity':.82,
+      }
+    });
+    map.addLayer({
+      id:'lbl-jut-base', type:'symbol', source:'s-jut-base',
+      layout:{
+        visibility:(document.getElementById('tog-jut-base').checked&&labelsOn)?'visible':'none',
+        'text-field':['concat',['get','peak_name'],' Base点'],
+        'text-font':['Open Sans Regular','Arial Unicode MS Regular'],
+        'text-size':['interpolate',['linear'],['zoom'],9,8,13,10],
+        'text-offset':[0,1.1],'text-anchor':'top',
+        'text-allow-overlap':false,'text-optional':true,
+      },
+      minzoom:9,
+      paint:{'text-color':'#30d888','text-halo-color':'rgba(0,15,10,.9)','text-halo-width':1.5},
+    });
+    map.on('mouseenter','dot-jut-base',()=>map.getCanvas().style.cursor='pointer');
+    map.on('mouseleave','dot-jut-base',()=>map.getCanvas().style.cursor='');
+    map.on('click','dot-jut-base',e=>{
+      e.preventDefault();
+      e.stopPropagation();
+      showJutBasePopup(e.features[0].properties, e.features[0].geometry.coordinates);
+    });
+  }
+
+  buildEprLayer(allEpr);
+  buildBaseCircleLayer(allBase);
+  updateCircleDsFilter();
+}
+
+async function ensureJutDatasetLoaded(ds, { silent = false } = {}){
+  if(!JUT_SOURCES[ds]) return;
+  jutLoadState[ds] ||= { loaded: false, loadingPromise: null };
+  if(jutLoadState[ds].loaded) return;
+  if(!jutLoadState[ds].loadingPromise){
+    const { dir, prefix } = JUT_SOURCES[ds];
+    if(!silent) setLoadingState(`正在加载 Jut · ${DS_LABEL[ds]}…`);
+    jutLoadState[ds].loadingPromise = Promise.all([
+      fetchJsonSafe(`${dir}/${prefix}_jut_bases.geojson`, {type:'FeatureCollection',features:[]}),
+      fetchJsonSafe(`${dir}/${prefix}_jut_profiles.json`, {}),
+      fetchJsonSafe(`${dir}/${prefix}_epr_circles.geojson`, {type:'FeatureCollection',features:[]}),
+      fetchJsonSafe(`${dir}/${prefix}_base_circles.geojson`, {type:'FeatureCollection',features:[]}),
+    ]).then(([bases, profiles, epr, base]) => {
+      const tag = feats => (feats || []).map(f => ({ ...f, properties: { ...(f.properties || {}), _ds: ds } }));
+      jutLoadState[ds] = {
+        loaded: true,
+        loadingPromise: null,
+        bases: { type:'FeatureCollection', features: tag(bases.features) },
+        profiles: profiles || {},
+        epr:   { type:'FeatureCollection', features: tag(epr.features) },
+        base:  { type:'FeatureCollection', features: tag(base.features) },
+      };
+      if(mapReadyResolved) rebuildLoadedJutLayers();
+    }).finally(() => {
+      if(jutLoadState[ds]) jutLoadState[ds].loadingPromise = null;
+    });
+  }
+  return jutLoadState[ds].loadingPromise;
+}
+
+async function loadJutData(dsList = null){
+  const targets = (dsList && dsList.length ? dsList : checkedDatasets()).filter(ds => JUT_SOURCES[ds]);
+  await Promise.all(targets.map(ds => ensureJutDatasetLoaded(ds, { silent: true })));
+  if(mapReadyResolved) rebuildLoadedJutLayers();
+}
+
+// ══════════════════════════════════════════════════════════════════
+// 地图初始化（仅加载默认勾选库；其他库按需懒加载）
+// ══════════════════════════════════════════════════════════════════
+const map = new maptilersdk.Map({
+  container: 'map',
+  style: WORKER_URL + '/proxy/api.maptiler.com/maps/outdoor-v2/style.json',
+  center: [116.2, 40.1], zoom: 9, pitch: 50, bearing: -6,
+  transformRequest: (url) => {
+    if (url.startsWith('https://api.maptiler.com')) {
+      const u = new URL(url);
+      u.searchParams.delete('key');
+      return { url: WORKER_URL + '/proxy/' + u.host + u.pathname + (u.search || '') };
+    }
+    return { url };
+  },
+});
+map.addControl(new maptilersdk.NavigationControl(), 'bottom-right');
+map.addControl(new maptilersdk.ScaleControl({unit: 'metric'}), 'bottom-left');
+
+function makeOverallFilter(){
+  const rMin = filterReliefPct, jMin = filterJutPct, aMin = filterAtsPct;
+  const mjxMin = filterMaxJutPct, maxMin = filterMaxAtsPct;
+  if(rMin===0 && jMin===0 && aMin===0 && mjxMin===0 && maxMin===0) return null;
+  const conds = [];
+  if(rMin>0)   conds.push(['<=',['get','mean_relief_crp'], 1-rMin]);
+  if(jMin>0)   conds.push(['<=',['get','mean_jut_crp'],    1-jMin]);
+  if(aMin>0)   conds.push(['<=',['get','mean_ats_crp'],    1-aMin]);
+  if(mjxMin>0) conds.push(['<=',['get','max_jut_crp'],     1-mjxMin]);
+  if(maxMin>0) conds.push(['<=',['get','max_ats_crp'],     1-maxMin]);
+  if(conds.length===1) return conds[0];
+  return ['all',...conds];
+}
+function rpFilter(){ return makeOverallFilter(); }
+function dotR(sz){return['interpolate',['linear'],['zoom'],5,sz*.45,9,sz,14,sz*1.7]}
+
+const mapReady = new Promise(resolve => map.on('load', () => {
+  mapReadyResolved = true;
+  resolve();
+}));
+
+mapReady.then(() => {
+  map.addSource('dem', {
+    type: 'raster-dem',
+    tiles: [`${WORKER_URL}/proxy/api.maptiler.com/tiles/terrain-rgb-v2/{z}/{x}/{y}.webp`],
+    tileSize: 256, maxzoom: 14, attribution: '© MapTiler'
+  });
+  map.setTerrain({ source: 'dem', exaggeration: 1.4 });
 });
 
+async function initLazyData(){
+  try{
+    setLoadingState('初始化地图…', 10);
+    await mapReady;
+    setupControls();
+    setupSearch();
+
+    const defaults = checkedDatasets();
+    if(defaults.length){
+      setLoadingState(`正在加载默认库（${defaults.length} 个）…`, 30);
+      for(let i = 0; i < defaults.length; i++){
+        const ds = defaults[i];
+        await ensureDatasetLoaded(ds, { withJut: false, silent: true });
+        setLoadingState(`已加载 ${DS_LABEL[ds]}`, 30 + Math.round(((i + 1) / defaults.length) * 45));
+      }
+      await loadJutData(defaults);
+    }
+
+    setLoadingState('初始化完成', 100);
+    hideLoading();
+  }catch(err){
+    console.error(err);
+    setLoadingState('初始化完成（部分数据未加载）', 100);
+    hideLoading();
+  }
+}
+
+initLazyData();
 // ══════════════════════════════════════════════════════════════════
 // 检索功能
 // ══════════════════════════════════════════════════════════════════
@@ -1032,138 +1213,22 @@ function clearSearch(){
 // Jut 数据加载 & 图层
 // ══════════════════════════════════════════════════════════════════
 
-function loadJutData(){
-  // Jut 文件已在页面启动时并发预取（prefetchedJut），此处直接等待结果，无重复请求
-  prefetchedJut.then(allResults => {
-    const allBases = {type:'FeatureCollection', features:[]};
-    const allProfiles = {};
-    const allEpr   = {type:'FeatureCollection', features:[]};
-    const allBase  = {type:'FeatureCollection', features:[]};
-
-    allResults.forEach(({ ds, bases: basesGeo, profiles, epr: eprGeo, base: baseGeo }) => {
-      // 给每个 feature 打上 ds 标签，实现按数据集开关
-      const tag = feats => feats.map(f => ({
-        ...f,
-        properties: {...f.properties, _ds: ds}
-      }));
-
-      allBases.features.push(...tag(basesGeo.features));
-      allProfiles[ds] = profiles;
-      allEpr.features.push(...tag(eprGeo.features));
-      allBase.features.push(...tag(baseGeo.features));
-    });
-
-    jutProfiles = allProfiles;
-
-    // 建立 name→EPR属性 快速索引
-    eprData = {};
-    allEpr.features.forEach(f => { eprData[f.properties.name] = f.properties; });
-
-    // 建立 name→基座圆属性 快速索引
-    baseCircleData = {};
-    allBase.features.forEach(f => { baseCircleData[f.properties.name] = f.properties; });
-
-    // 记录各库各峰名集合（用于联动可见性）
-    dsCircleNames = {};  // ds -> Set<name>
-    allEpr.features.forEach(f => {
-      const ds = f.properties._ds;
-      if(!dsCircleNames[ds]) dsCircleNames[ds] = new Set();
-      dsCircleNames[ds].add(f.properties.name);
-    });
-    // 同时收录 jut_bases 的 peak_name，确保有base点但无epr圆的峰也可见
-    allBases.features.forEach(f => {
-      const ds = f.properties._ds;
-      if(!dsCircleNames[ds]) dsCircleNames[ds] = new Set();
-      dsCircleNames[ds].add(f.properties.peak_name);
-    });
-
-
-    // ── 重叠Base点坐标偏移：同坐标多峰时，各自向峰方向偏移30m ──────
-    (function spreadOverlappingBases(features, offsetM) {
-      const groups = {};
-      features.forEach((f, i) => {
-        const [lon, lat] = f.geometry.coordinates;
-        const key = lon.toFixed(5) + ',' + lat.toFixed(5);
-        if (!groups[key]) groups[key] = [];
-        groups[key].push(i);
-      });
-      Object.values(groups).forEach(idxs => {
-        if (idxs.length < 2) return;
-        const [bLon, bLat] = features[idxs[0]].geometry.coordinates;
-        const cosLat = Math.cos(bLat * Math.PI / 180);
-        idxs.forEach(idx => {
-          const p = features[idx].properties;
-          const dx = (p.peak_lon - bLon) * 111000 * cosLat;
-          const dy = (p.peak_lat - bLat) * 111000;
-          const angle = Math.atan2(dy, dx);
-          features[idx].geometry.coordinates = [
-            bLon + offsetM * Math.cos(angle) / (111000 * cosLat),
-            bLat + offsetM * Math.sin(angle) / 111000,
-          ];
-        });
-      });
-    })(allBases.features, 30);
-    // ────────────────────────────────────────────────────────────
-
-    // ── 1. Jut Base Points Layer ───────────────────────────────
-    map.addSource('s-jut-base', {type:'geojson', data: allBases});
-
-    map.addLayer({
-      id:'dot-jut-base', type:'circle', source:'s-jut-base',
-      layout:{visibility: document.getElementById('tog-jut-base').checked?'visible':'none'},
-      paint:{
-        'circle-radius':['interpolate',['linear'],['zoom'],5,3,9,5,14,7],
-        'circle-color':'#40ffa0',
-        'circle-stroke-width':['interpolate',['linear'],['zoom'],6,.8,11,1.4],
-        'circle-stroke-color':'rgba(0,50,30,.8)',
-        'circle-opacity':.82,
-      }
-    });
-
-    map.addLayer({
-      id:'lbl-jut-base', type:'symbol', source:'s-jut-base',
-      layout:{
-        visibility:(document.getElementById('tog-jut-base').checked&&labelsOn)?'visible':'none',
-        'text-field':['concat',['get','peak_name'],' Base点'],
-        'text-font':['Open Sans Regular','Arial Unicode MS Regular'],
-        'text-size':['interpolate',['linear'],['zoom'],9,8,13,10],
-        'text-offset':[0,1.1],'text-anchor':'top',
-        'text-allow-overlap':false,'text-optional':true,
-      },
-      minzoom:9,
-      paint:{'text-color':'#30d888','text-halo-color':'rgba(0,15,10,.9)','text-halo-width':1.5},
-    });
-
-    map.on('mouseenter','dot-jut-base',()=>map.getCanvas().style.cursor='pointer');
-    map.on('mouseleave','dot-jut-base',()=>map.getCanvas().style.cursor='');
-    map.on('click','dot-jut-base',e=>{
-      e.preventDefault();
-      e.stopPropagation();
-      showJutBasePopup(e.features[0].properties, e.features[0].geometry.coordinates);
-    });
-
-    // ── 2. EPR Circles ──────────────────────────────────────────
-    buildEprLayer(allEpr);
-    // ── 3. Base Circles ─────────────────────────────────────────
-    buildBaseCircleLayer(allBase);
-
-    // 初始化各数据集开关对圆的联动
-    updateCircleDsFilter();
-  });
-}
-
 function buildBaseCircleLayer(baseGeo){
-  if(!baseGeo || !baseGeo.features.length) return;
   const sorted = {type:'FeatureCollection',
-    features:[...baseGeo.features].sort((a,b)=>b.properties.eq_radius-a.properties.eq_radius)};
+    features:[...(baseGeo?.features || [])].sort((a,b)=>b.properties.eq_radius-a.properties.eq_radius)};
 
-  map.addSource('s-base-circle',{type:'geojson', data:sorted});
+  if(map.getSource('s-base-circle')){
+    map.getSource('s-base-circle').setData(sorted);
+  }else{
+    map.addSource('s-base-circle',{type:'geojson', data:sorted});
+
+  }
 
   const togOn = document.getElementById('tog-base-circle').checked;
   const op = eprOpacity;
 
   const firstDotLayerB = Object.keys(FILES).map(ds=>`dot-${ds}`).find(id=>map.getLayer(id));
-  map.addLayer({
+  if(!map.getLayer('fill-base-circle')) map.addLayer({
     id:'fill-base-circle', type:'fill', source:'s-base-circle',
     layout:{visibility:togOn?'visible':'none'},
     paint:{
@@ -1177,7 +1242,7 @@ function buildBaseCircleLayer(baseGeo){
     }
   }, firstDotLayerB);
 
-  map.addLayer({
+  if(!map.getLayer('stroke-base-circle')) map.addLayer({
     id:'stroke-base-circle', type:'line', source:'s-base-circle',
     layout:{visibility:togOn?'visible':'none'},
     paint:{
@@ -1188,13 +1253,16 @@ function buildBaseCircleLayer(baseGeo){
     }
   }, firstDotLayerB);
 
-  map.on('mouseenter','fill-base-circle',()=>map.getCanvas().style.cursor='pointer');
-  map.on('mouseleave','fill-base-circle',()=>map.getCanvas().style.cursor='');
-  map.on('click','fill-base-circle',e=>{
+  if(!buildBaseCircleLayer._eventsBound){
+    map.on('mouseenter','fill-base-circle',()=>map.getCanvas().style.cursor='pointer');
+    map.on('mouseleave','fill-base-circle',()=>map.getCanvas().style.cursor='');
+    map.on('click','fill-base-circle',e=>{
     e.preventDefault();
     const p=e.features[0].properties;
-    showBaseCirclePopup(p,[p.center_lon,p.center_lat]);
-  });
+      showBaseCirclePopup(p,[p.center_lon,p.center_lat]);
+    });
+    buildBaseCircleLayer._eventsBound = true;
+  }
 }
 
 function showBaseCirclePopup(p, coords){
@@ -1228,18 +1296,20 @@ function showBaseCirclePopup(p, coords){
 function buildEprLayer(eprGeo){
   // 按 eq_radius 降序排列：半径大的先渲染，小的在上层（视觉上不被遮挡）
   const sorted = {type:'FeatureCollection',
-    features:[...eprGeo.features].sort((a,b)=>b.properties.eq_radius-a.properties.eq_radius)};
+    features:[...(eprGeo?.features || [])].sort((a,b)=>b.properties.eq_radius-a.properties.eq_radius)};
 
-
-
-  map.addSource('s-epr',{type:'geojson',data:sorted});
+  if(map.getSource('s-epr')){
+    map.getSource('s-epr').setData(sorted);
+  }else{
+    map.addSource('s-epr',{type:'geojson',data:sorted});
+  }
 
   const togOn = document.getElementById('tog-epr').checked;
   const op = eprOpacity; // 使用全局透明度变量
 
   // Fill layer - 插入到所有山峰点层之前（圆在底部不遮挡点）
   const firstDotLayer = Object.keys(FILES).map(ds=>`dot-${ds}`).find(id=>map.getLayer(id));
-  map.addLayer({
+  if(!map.getLayer('fill-epr')) map.addLayer({
     id:'fill-epr', type:'fill', source:'s-epr',
     layout:{visibility:togOn?'visible':'none'},
     paint:{
@@ -1255,7 +1325,7 @@ function buildEprLayer(eprGeo){
   }, firstDotLayer);
 
   // Stroke layer
-  map.addLayer({
+  if(!map.getLayer('stroke-epr')) map.addLayer({
     id:'stroke-epr', type:'line', source:'s-epr',
     layout:{visibility:togOn?'visible':'none'},
     paint:{
@@ -1269,13 +1339,16 @@ function buildEprLayer(eprGeo){
     }
   }, firstDotLayer);
 
-  map.on('mouseenter','fill-epr',()=>map.getCanvas().style.cursor='pointer');
-  map.on('mouseleave','fill-epr',()=>map.getCanvas().style.cursor='');
-  map.on('click','fill-epr',e=>{
+  if(!buildEprLayer._eventsBound){
+    map.on('mouseenter','fill-epr',()=>map.getCanvas().style.cursor='pointer');
+    map.on('mouseleave','fill-epr',()=>map.getCanvas().style.cursor='');
+    map.on('click','fill-epr',e=>{
     e.preventDefault();
     const p=e.features[0].properties;
-    showEprPopup(p,[p.center_lon,p.center_lat]);
-  });
+      showEprPopup(p,[p.center_lon,p.center_lat]);
+    });
+    buildEprLayer._eventsBound = true;
+  }
 }
 
 function showJutBasePopup(p, coords){
@@ -1645,7 +1718,6 @@ function showEprPopup(p, coords){
 function setVis(ds,on){
   if(map.getLayer(`dot-${ds}`)) map.setLayoutProperty(`dot-${ds}`,'visibility',on?'visible':'none');
   if(map.getLayer(`lbl-${ds}`)) map.setLayoutProperty(`lbl-${ds}`,'visibility',(on&&labelsOn)?'visible':'none');
-  // 同步圆图层
   updateCircleDsFilter();
 }
 
@@ -1748,19 +1820,44 @@ function getCrpJutVisibleNames(){
   return visibleNames;
 }
 function setupControls(){
-  Object.keys(FILES).forEach(ds=>document.getElementById(`tog-${ds}`).addEventListener('change',e=>setVis(ds,e.target.checked)));
-  document.getElementById('tog-jut-base').addEventListener('change',e=>{
+  if(setupControls._bound) return;
+  setupControls._bound = true;
+
+  Object.keys(FILES).forEach(ds=>document.getElementById(`tog-${ds}`).addEventListener('change', async e => {
+    const on = e.target.checked;
+    if(on){
+      await ensureDatasetLoaded(ds, { withJut: true });
+      if(document.getElementById('tog-jut-base').checked || document.getElementById('tog-epr').checked || document.getElementById('tog-base-circle').checked){
+        await ensureJutDatasetLoaded(ds, { silent: true });
+        rebuildLoadedJutLayers();
+      }
+    }
+    setVis(ds, on);
+  }));
+
+  document.getElementById('tog-jut-base').addEventListener('change', async e=>{
     const on=e.target.checked;
+    if(on){
+      await loadJutData();
+    }
     if(map.getLayer('dot-jut-base')) map.setLayoutProperty('dot-jut-base','visibility',on?'visible':'none');
     if(map.getLayer('lbl-jut-base')) map.setLayoutProperty('lbl-jut-base','visibility',(on&&labelsOn)?'visible':'none');
   });
-  document.getElementById('tog-epr').addEventListener('change',e=>{
-    const v=e.target.checked?'visible':'none';
+  document.getElementById('tog-epr').addEventListener('change', async e=>{
+    const on = e.target.checked;
+    if(on){
+      await loadJutData();
+    }
+    const v=on?'visible':'none';
     if(map.getLayer('fill-epr')) map.setLayoutProperty('fill-epr','visibility',v);
     if(map.getLayer('stroke-epr')) map.setLayoutProperty('stroke-epr','visibility',v);
   });
-  document.getElementById('tog-base-circle').addEventListener('change',e=>{
-    const v=e.target.checked?'visible':'none';
+  document.getElementById('tog-base-circle').addEventListener('change', async e=>{
+    const on = e.target.checked;
+    if(on){
+      await loadJutData();
+    }
+    const v=on?'visible':'none';
     if(map.getLayer('fill-base-circle'))   map.setLayoutProperty('fill-base-circle','visibility',v);
     if(map.getLayer('stroke-base-circle')) map.setLayoutProperty('stroke-base-circle','visibility',v);
   });
