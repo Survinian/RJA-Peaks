@@ -419,6 +419,10 @@ canvas.jc{width:100% !important;height:160px !important}
       <input type="range" id="sl-filter-ats" min="0" max="95" step="5" value="0">
     </div>
     <div class="sl-row">
+      <div class="sl-lbl"><span>10kmORS表现</span><span class="sv" id="v-filter-ors">不筛除</span></div>
+      <input type="range" id="sl-filter-ors" min="0" max="95" step="5" value="0">
+    </div>
+    <div class="sl-row">
       <div class="sl-lbl"><span>最大Jut峰值表现</span><span class="sv" id="v-filter-maxjut">不筛除</span></div>
       <input type="range" id="sl-filter-maxjut" min="0" max="95" step="5" value="0">
     </div>
@@ -426,7 +430,7 @@ canvas.jc{width:100% !important;height:160px !important}
       <div class="sl-lbl"><span>最大ATS峰值表现</span><span class="sv" id="v-filter-maxats">不筛除</span></div>
       <input type="range" id="sl-filter-maxats" min="0" max="95" step="5" value="0">
     </div>
-    <div style="font-size:9px;color:#2a4060;margin-top:-4px;margin-bottom:4px;line-height:1.5">以上五项取并集（满足任一即显示）</div>
+    <div style="font-size:9px;color:#2a4060;margin-top:-4px;margin-bottom:4px;line-height:1.5">以上六项取并集（满足任一即显示）</div>
     <div class="ds-row" style="border-bottom:1px solid rgba(255,255,255,.04);padding-bottom:5px">
       <div class="ds-l"><span style="font-size:10px;color:#4a7aaa">隐藏外卡通道山峰</span><br><span style="font-size:8.5px;color:#2a4060;padding-left:2px">仅显示Step-2达标山峰</span></div>
       <label class="sw"><input type="checkbox" id="cb-hide-wildcard"><span class="sw-t"></span></label>
@@ -517,6 +521,7 @@ canvas.jc{width:100% !important;height:160px !important}
       <div class="metric-btn on" id="mbt-relief" onclick="setBandMetric('relief')">高差</div>
       <div class="metric-btn"    id="mbt-jut"    onclick="setBandMetric('jut')">Jut</div>
       <div class="metric-btn"    id="mbt-ats"    onclick="setBandMetric('ats')">ATS</div>
+      <div class="metric-btn"    id="mbt-ors"    onclick="setBandMetric('ors')">ORS</div>
     </div>
   </div>
   <div class="panel-body" style="flex:1;overflow-y:auto">
@@ -728,14 +733,14 @@ maptilersdk.config.apiKey = 'proxy-mode';
 maptilersdk.config.fetch = window.fetch;
 
 // ── 状态 ──────────────────────────────────────────────────────
-let filterReliefPct = 0, filterJutPct = 0, filterAtsPct = 0; // 总体表现筛除（击败率下限，0=不筛）
+let filterReliefPct = 0, filterJutPct = 0, filterAtsPct = 0, filterOrsPct = 0; // 总体表现筛除（击败率下限，0=不筛）
 let filterMaxJutPct = 0, filterMaxAtsPct = 0; // 峰值筛除（击败率下限，0=不筛）
 let hideWildcard = false; // 隐藏外卡通道山峰
 const ELITE_DS = new Set(['elite','jidong_elite','xuanda_elite','zhongtaihang_elite','nantaihang_elite','chahar_elite','yanba_elite','chifeng_elite','suishuo_elite','lvliangshan_elite','fenqin_elite','taiyi_elite','jiaodong_elite','yinshan_elite']);
 let dotSize = 5, labelsOn = true;
 let activePopup = null, chartInstances = {};
 let activeBands = new Set(), bandMode = 'any', bandThr = 0.15;
-let bandMetric = 'relief';  // 'relief' | 'jut' | 'ats'
+let bandMetric = 'relief';  // 'relief' | 'jut' | 'ats' | 'ors'
 let allData = {};            // ds -> FeatureCollection（仅已加载）
 let searchIndex = [];        // [{name,source,lon,lat,elev,props}]
 let jutProfiles = {};        // ds -> profile json
@@ -1040,19 +1045,22 @@ const map = new maptilersdk.Map({
 map.addControl(new maptilersdk.NavigationControl(), 'bottom-right');
 map.addControl(new maptilersdk.ScaleControl({unit: 'metric'}), 'bottom-left');
 
+
 function makeOverallFilter(){
-  const rMin = filterReliefPct, jMin = filterJutPct, aMin = filterAtsPct;
+  const rMin = filterReliefPct, jMin = filterJutPct, aMin = filterAtsPct, oMin = filterOrsPct;
   const mjxMin = filterMaxJutPct, maxMin = filterMaxAtsPct;
-  if(rMin===0 && jMin===0 && aMin===0 && mjxMin===0 && maxMin===0) return null;
+  if(rMin===0 && jMin===0 && aMin===0 && oMin===0 && mjxMin===0 && maxMin===0) return null;
   const conds = [];
   if(rMin>0)   conds.push(['<=',['get','mean_relief_crp'], 1-rMin]);
   if(jMin>0)   conds.push(['<=',['get','mean_jut_crp'],    1-jMin]);
   if(aMin>0)   conds.push(['<=',['get','mean_ats_crp'],    1-aMin]);
+  if(oMin>0)   conds.push(['<=',['get','ors_10km_crp'],    1-oMin]);
   if(mjxMin>0) conds.push(['<=',['get','max_jut_crp'],     1-mjxMin]);
   if(maxMin>0) conds.push(['<=',['get','max_ats_crp'],     1-maxMin]);
   if(conds.length===1) return conds[0];
   return ['all',...conds];
 }
+
 function rpFilter(){ return makeOverallFilter(); }
 function dotR(sz){return['interpolate',['linear'],['zoom'],5,sz*.45,9,sz,14,sz*1.7]}
 
@@ -1909,6 +1917,11 @@ function setupControls(){
     document.getElementById('v-filter-ats').textContent = pctLabel(parseInt(e.target.value));
     applyCrpFilter();
   });
+  document.getElementById('sl-filter-ors').addEventListener('input',e=>{
+    filterOrsPct = parseInt(e.target.value)/100;
+    document.getElementById('v-filter-ors').textContent = pctLabel(parseInt(e.target.value));
+    applyCrpFilter();
+  });
   document.getElementById('sl-filter-maxjut').addEventListener('input',e=>{
     filterMaxJutPct = parseInt(e.target.value)/100;
     document.getElementById('v-filter-maxjut').textContent = pctLabel(parseInt(e.target.value));
@@ -2600,5 +2613,266 @@ document.getElementById('stats-modal').addEventListener('click', e => {
   if(e.target === document.getElementById('stats-modal')) closeStatsModal();
 });
 </script>
+
+<script>
+// ===== ORS patch =====
+(function(){
+  if (Array.isArray(GLOBAL_METRICS) && !GLOBAL_METRICS.some(m=>m.id==='ors_10km')) {
+    GLOBAL_METRICS.splice(3, 0, { id:'ors_10km', label:'10kmORS', unit:'', field:'ors_10km', src:'prop' });
+  }
+  if (Array.isArray(BAND_METRICS) && !BAND_METRICS.some(m=>m.id==='band_ors')) {
+    BAND_METRICS.push({ id:'band_ors', label:'ORS', unit:'', chartField:'chart_ors', rFieldKey:'chart_ors_r' });
+  }
+
+  window.setBandMetric = function(m){
+    bandMetric=m;
+    ['relief','jut','ats','ors'].forEach(k=>{
+      const btn=document.getElementById('mbt-'+k);
+      if(btn) btn.classList.toggle('on', k===m);
+    });
+    applyBandFilter();
+  };
+
+  window.applyBandFilter = function(){
+    const keyMap = { relief:'band_rp', jut:'band_jut_rp', ats:'band_ats_rp', ors:'band_ors_rp' };
+    const propKey = keyMap[bandMetric] || 'band_rp';
+    let total=0;
+    const bandVisibleNames = new Set();
+    Object.keys(allData).forEach(ds=>{
+      const src=map.getSource(`s-${ds}`);if(!src) return;
+      if(activeBands.size===0){
+        src.setData(allData[ds]);
+        total+=allData[ds].features.length;
+        allData[ds].features.forEach(f=>bandVisibleNames.add(f.properties.name));
+      } else {
+        const hits=allData[ds].features.filter(f=>{
+          let bp={};try{bp=JSON.parse(f.properties[propKey]||'{}');}catch{}
+          const passes=[...activeBands].map(b=>{
+            const v=bp[b];
+            return (v!==null&&v!==undefined&&v<=bandThr);
+          });
+          return bandMode==='any'?passes.some(Boolean):passes.every(Boolean);
+        });
+        src.setData({type:'FeatureCollection',features:hits});
+        total+=hits.length;
+        hits.forEach(f=>bandVisibleNames.add(f.properties.name));
+      }
+    });
+    if(activeBands.size>0){
+      const el=document.getElementById('hit-cnt'); if(el) el.textContent=total.toLocaleString();
+    }
+    if(activeBands.size===0){
+      applyAllCircleFilters();
+    } else {
+      const dsF = currentDsCircleFilter;
+      const bandF = ['in',['get','name'],['literal',[...bandVisibleNames]]];
+      function buildBandFilter(extraRank){
+        const parts = [dsF, bandF, extraRank].filter(Boolean);
+        if(parts.length===0) return null;
+        if(parts.length===1) return parts[0];
+        return ['all',...parts];
+      }
+      ['fill-epr','stroke-epr'].forEach(id=>{ if(map.getLayer(id)) map.setFilter(id, buildBandFilter(null)); });
+      ['fill-base-circle','stroke-base-circle'].forEach(id=>{ if(map.getLayer(id)) map.setFilter(id, buildBandFilter(null)); });
+      if(map.getLayer('dot-jut-base')){
+        const dsNames = new Set();
+        Object.keys(JUT_SOURCES||{}).forEach(ds2=>{
+          const tog = document.getElementById(`tog-${ds2}`);
+          if(!tog || !tog.checked) return;
+          (dsCircleNames[ds2]||new Set()).forEach(n=>dsNames.add(n));
+        });
+        const bpAllowed = [...bandVisibleNames].filter(n=>dsNames.size===0||dsNames.has(n));
+        const bpF = ['in',['get','peak_name'],['literal', bpAllowed]];
+        map.setFilter('dot-jut-base', bpF);
+        map.setFilter('lbl-jut-base', bpF);
+      }
+    }
+  };
+
+  window.switchBandTab = function(metric,uid){
+    ['relief','jut','ats','ors'].forEach(m=>{
+      const btn=document.getElementById(`btb-${m}-${uid}`);
+      const panel=document.getElementById(`bb-${m}-${uid}`);
+      const isOn=(m===metric);
+      if(btn){
+        btn.style.color=isOn?'#80c0ff':'#2a5a90';
+        btn.style.borderBottomColor=isOn?'#60a8ff':'transparent';
+        btn.style.fontWeight=isOn?'700':'400';
+      }
+      if(panel) panel.style.display=isOn?'block':'none';
+    });
+  };
+
+  function buildOrsChart(uid, radii, orsVals){
+    const canvas = document.getElementById(uid+'-oc');
+    if(!canvas || !orsVals || !orsVals.length) return;
+    const labels = radii.map(r=>r>=1000?(r/1000).toFixed(r%1000===0?0:1)+'k':String(r));
+    chartInstances[uid+'o'] = new Chart(canvas,{type:'line',
+      data:{labels,datasets:[{label:'ORS',data:orsVals,borderColor:'#ff9f40',backgroundColor:'rgba(255,159,64,.10)',borderWidth:2.2,tension:.35,fill:true,pointRadius:2,pointBackgroundColor:'#ff9f40'}]},
+      options:{responsive:true,maintainAspectRatio:false,animation:{duration:220},plugins:{legend:{display:false},tooltip:{mode:'index',intersect:false,backgroundColor:'rgba(28,16,0,.92)',titleColor:'#ffcf90',bodyColor:'#d99a55',callbacks:{title:i=>`半径 ${Number(radii[i[0].dataIndex]).toLocaleString()} m`,label:i=>`ORS: ${i.raw}`}}},scales:{x:{grid:{color:'rgba(120,80,0,.10)'},ticks:{font:{size:9},color:'#9b6a24',maxRotation:40}},y:{grid:{color:'rgba(120,80,0,.10)'},ticks:{font:{size:9},color:'#9b6a24'},title:{display:true,text:'ORS',font:{size:9},color:'#9b6a24'}}}}
+    });
+  }
+  function buildOrsRankChart(uid, radii, orsRankData){
+    const canvas = document.getElementById(uid+'-okc');
+    if(!canvas || !orsRankData || !orsRankData.length) return;
+    const labels = radii.map(r=>r>=1000?(r/1000).toFixed(r%1000===0?0:1)+'k':String(r));
+    chartInstances[uid+'ok'] = new Chart(canvas,{type:'line',
+      data:{labels,datasets:[{label:'ORS排名',data:orsRankData,borderColor:'#ff9f40',backgroundColor:'rgba(255,159,64,.10)',borderWidth:2.2,tension:.35,fill:true,pointRadius:2,pointBackgroundColor:'#ff9f40'}]},
+      options:{responsive:true,maintainAspectRatio:false,animation:{duration:220},plugins:{legend:{display:false},tooltip:{mode:'index',intersect:false,backgroundColor:'rgba(28,16,0,.92)',titleColor:'#ffcf90',bodyColor:'#d99a55',callbacks:{title:i=>`半径 ${Number(radii[i[0].dataIndex]).toLocaleString()} m`,label:i=>`ORS排名：第 ${i.raw} 名`}}},scales:{x:{grid:{color:'rgba(120,80,0,.10)'},ticks:{font:{size:9},color:'#9b6a24',maxRotation:40}},y:{reverse:true,grid:{color:'rgba(120,80,0,.10)'},ticks:{font:{size:9},color:'#9b6a24'},title:{display:true,text:'ORS排名（越小越优）',font:{size:9},color:'#9b6a24'}}}}
+    });
+  }
+
+  window.showPopup = function(p,coords,ds){
+    Object.values(chartInstances).forEach(c=>{try{c.destroy();}catch{}});
+    chartInstances={};
+    const peakName=p.name||'';
+    const jProf=(jutProfiles[ds]||{})[peakName]||{};
+    const eprP=eprData[peakName];
+    const bcP=baseCircleData[peakName];
+    const hasJut=jProf&&jProf.radii&&jProf.radii.length>0;
+
+    const scoreParts=[p.mean_relief_crp,p.mean_jut_crp,p.mean_ats_crp,p.ors_10km_crp,p.max_jut_crp,p.max_ats_crp]
+      .map(v=>v!=null && v!=='' && !Number.isNaN(parseFloat(v)) ? parseFloat(v) : null)
+      .filter(v=>v!==null);
+    const rp=scoreParts.length ? scoreParts.reduce((a,b)=>a+b,0)/scoreParts.length : (p.rp!=null ? parseFloat(p.rp) : 0.5);
+    const hue=rpHue(rp);
+    const cM=`hsl(${hue},72%,58%)`,cX=`hsl(${hue},44%,72%)`;
+    const uid='pp'+Date.now();
+    const sCol=DS_COLOR[ds]||'#60a8ff',sLbl=DS_LABEL[ds]||ds;
+    const radii=JSON.parse(p.chart_r||'[]'),maxRel=JSON.parse(p.chart_mx||'[]'),meanRl=JSON.parse(p.chart_mn||'[]'),meanRk=JSON.parse(p.chart_rk||'[]');
+    const hasC=radii.length>0,hasRk=meanRk.length>0;
+    const orsRadii=JSON.parse(p.chart_ors_r||'[]');
+    const orsVals=JSON.parse(p.chart_ors||'[]');
+    const orsRanks=JSON.parse(p.chart_ors_rk||'[]');
+    const hasOrs=orsRadii.length>0 && orsVals.length>0;
+
+    const mrCrp  = p.mean_relief_crp!=null ? Math.round((1-parseFloat(p.mean_relief_crp))*100) : null;
+    const mjCrp  = p.mean_jut_crp!=null    ? Math.round((1-parseFloat(p.mean_jut_crp))*100)    : null;
+    const maCrp  = p.mean_ats_crp!=null    ? Math.round((1-parseFloat(p.mean_ats_crp))*100)    : null;
+    const orsCrp = p.ors_10km_crp!=null    ? Math.round((1-parseFloat(p.ors_10km_crp))*100)    : null;
+    const mjxCrp = p.max_jut_crp!=null     ? Math.round((1-parseFloat(p.max_jut_crp))*100)     : null;
+    const maxCrp = p.max_ats_crp!=null     ? Math.round((1-parseFloat(p.max_ats_crp))*100)     : null;
+    const fmtPct = v => (v===null||v===undefined)?'—':`${v}%`;
+    const ors10 = p.ors_10km!=null ? Number(p.ors_10km).toFixed(2) : '—';
+    const ors10Rank = p.ors_10km_rank!=null ? `#${p.ors_10km_rank}` : '—';
+    const bestOrsRank = p.best_ors_rank!=null ? `#${p.best_ors_rank}` : '—';
+    const bestOrsRadius = p.best_ors_radius!=null ? `${Number(p.best_ors_radius).toLocaleString()} m` : '—';
+
+    const maxJut = p.max_jut!=null ? parseFloat(p.max_jut).toFixed(2) : '—';
+    const maxMeanJut = p.max_mean_jut!=null ? parseFloat(p.max_mean_jut).toFixed(2) : (eprP&&eprP.max_mean_jut!=null ? Number(eprP.max_mean_jut).toFixed(2) : '—');
+    const maxMeanJutR = p.max_mean_jut_r!=null ? `${parseInt(p.max_mean_jut_r).toLocaleString()} m` : (eprP&&eprP.eq_radius!=null ? `${Number(eprP.eq_radius).toLocaleString()} m` : '—');
+    const mmjRp = (p.max_mean_jut_rp!=null && p.max_mean_jut>0) ? Math.round((1-parseFloat(p.max_mean_jut_rp))*100) : null;
+    const maxFsi = p.max_fsi!=null ? parseFloat(p.max_fsi).toFixed(4) : '—';
+    const maxFsiR = p.max_fsi_r!=null ? `${parseInt(p.max_fsi_r).toLocaleString()} m` : '—';
+    const maxAts = p.max_ats!=null ? parseFloat(p.max_ats).toFixed(2) : (bcP&&bcP.max_ats!=null ? Number(bcP.max_ats).toFixed(2) : '—');
+    const maxAtsR = p.max_ats_r!=null ? `${parseInt(p.max_ats_r).toLocaleString()} m` : (bcP&&bcP.eq_radius!=null ? `${Number(bcP.eq_radius).toLocaleString()} m` : '—');
+    const maxAtsRp = (p.max_ats_rp!=null && p.max_ats>0) ? Math.round((1-parseFloat(p.max_ats_rp))*100) : null;
+    const rProm = p.r_prominence!=null ? `${parseInt(p.r_prominence).toLocaleString()} m` : (eprP&&eprP.eq_radius!=null ? `${Number(eprP.eq_radius).toLocaleString()} m` : '—');
+    const rBase = p.r_base!=null ? `${parseInt(p.r_base).toLocaleString()} m` : (bcP&&bcP.eq_radius!=null ? `${Number(bcP.eq_radius).toLocaleString()} m` : '—');
+    const atsConf = p.ats_conf != null ? parseFloat(p.ats_conf) : null;
+    const jutConf = p.jut_conf != null ? parseFloat(p.jut_conf) : null;
+
+    function confBadge(conf, label) {
+      if(conf===null) return '';
+      const pct = Math.round(conf*100);
+      const hue = Math.round(conf*120);
+      const tag = conf>=0.5?'高':conf>=0.25?'中':'低';
+      return `<span style="font-size:9px;color:hsl(${hue},70%,55%);font-weight:700" title="折线峰值置信度：${pct}%（越高说明${label}越明确）">置信${tag}(${pct}%)</span>`;
+    }
+    function crpBadge(pct){
+      if(pct===null) return '<span style="color:#2a4060">—</span>';
+      const hue=Math.round(pct*2.2);
+      return `<span style="color:hsl(${hue},72%,58%);font-weight:700;font-family:monospace">${pct}%</span>`;
+    }
+
+    const html=`
+<div class="pp-wrap">
+<div class="pp-hd"><span>${p.name||'无名峰'}</span><span class="pp-src" style="background:${sCol}22;color:${sCol};border:1px solid ${sCol}44">${sLbl}</span></div>
+<div class="pp-body">
+  <div class="pp-row"><span>海拔</span><span class="pp-val">${p.elev!=null?p.elev+' m':'—'}</span></div>
+  <div class="pp-row"><span>库内综合击败率</span><span class="pp-val" style="color:hsl(${hue},72%,62%)">${((1-rp)*100).toFixed(1)} %</span></div>
+  ${p.region?`<div class="pp-row"><span>所属地区</span><span class="pp-val" style="color:#80a0c0">${p.region}</span></div>`:''}
+</div>
+<div style="padding:4px 14px 6px;background:rgba(20,30,60,.3);border-top:1px solid rgba(90,140,220,.1)">
+  <div style="font-size:8.5px;color:#2a4060;margin-bottom:5px;letter-spacing:.5px">▸ 综合排名击败率</div>
+  <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:3px;margin-bottom:3px">
+    <div style="text-align:center;background:rgba(90,140,220,.06);padding:4px 2px;border-radius:5px"><div style="font-size:8px;color:#2a4060">高差均值</div>${crpBadge(mrCrp)}</div>
+    <div style="text-align:center;background:rgba(0,200,100,.06);padding:4px 2px;border-radius:5px"><div style="font-size:8px;color:#2a6a4a">Jut均值</div>${crpBadge(mjCrp)}</div>
+    <div style="text-align:center;background:rgba(0,150,255,.06);padding:4px 2px;border-radius:5px"><div style="font-size:8px;color:#2a5a7a">ATS均值</div>${crpBadge(maCrp)}</div>
+    <div style="text-align:center;background:rgba(255,160,64,.08);padding:4px 2px;border-radius:5px"><div style="font-size:8px;color:#8a5a20">10kmORS</div>${crpBadge(orsCrp)}</div>
+  </div>
+  <div style="font-size:8.5px;color:#2a4060;margin-bottom:3px;letter-spacing:.5px">▸ 峰值排名击败率</div>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:3px;margin-bottom:5px">
+    <div style="text-align:center;background:rgba(0,200,100,.08);padding:4px 2px;border-radius:5px"><div style="font-size:8px;color:#2a6a4a">最大Jut峰值</div>${crpBadge(mjxCrp)}</div>
+    <div style="text-align:center;background:rgba(0,150,255,.08);padding:4px 2px;border-radius:5px"><div style="font-size:8px;color:#2a5a7a">最大ATS峰值</div>${crpBadge(maxCrp)}</div>
+  </div>
+  <div style="font-size:8.5px;color:#2a4060;margin-bottom:3px;letter-spacing:.5px">▸ 峰值 / 关键指标</div>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:3px 10px">
+    <div class="pp-row" style="margin:0"><span style="color:#8a5a20;font-size:10px">10kmORS数值</span><span style="color:#ffb04d;font-weight:700;font-family:monospace;font-size:11px">${ors10}</span></div>
+    <div class="pp-row" style="margin:0"><span style="color:#8a5a20;font-size:10px">10kmORS排名</span><span style="color:#ffb04d;font-family:monospace;font-size:11px">${ors10Rank}</span></div>
+    <div class="pp-row" style="margin:0"><span style="color:#8a5a20;font-size:10px">ORS最大排名</span><span style="color:#ffb04d;font-family:monospace;font-size:11px">${bestOrsRank}</span></div>
+    <div class="pp-row" style="margin:0"><span style="color:#8a5a20;font-size:10px">↑ 对应半径</span><span style="color:#ffb04d;font-family:monospace;font-size:11px">${bestOrsRadius}</span></div>
+    <div class="pp-row" style="margin:0"><span style="color:#3a7a5a;font-size:10px">最大Jut</span><span style="color:#40ffa0;font-weight:700;font-family:monospace;font-size:11px">${maxJut}</span></div>
+    <div class="pp-row" style="margin:0"><span style="color:#3a7a5a;font-size:10px">最大均Jut</span><span style="color:#40ffa0;font-weight:700;font-family:monospace;font-size:11px">${maxMeanJut}</span></div>
+    <div class="pp-row" style="margin:0"><span style="color:#6a5a30;font-size:10px">↑ 对应半径</span><span style="color:#ffd700;font-family:monospace;font-size:10px">${maxMeanJutR}</span></div>
+    <div class="pp-row" style="margin:0"><span style="color:#3a7a5a;font-size:10px">↑ 全库击败</span><span style="color:#40ffa0;font-family:monospace;font-size:10px">${fmtPct(mmjRp)}</span></div>
+    <div class="pp-row" style="margin:0"><span style="color:#6a5a7a;font-size:10px">最大FSI</span><span style="color:#c0a0ff;font-weight:700;font-family:monospace;font-size:11px">${maxFsi}</span></div>
+    <div class="pp-row" style="margin:0"><span style="color:#6a5a7a;font-size:10px">↑ 对应半径</span><span style="color:#c0a0ff;font-family:monospace;font-size:10px">${maxFsiR}</span></div>
+    <div class="pp-row" style="margin:0"><span style="color:#2a5a7a;font-size:10px">最大ATS</span><span style="color:#60c8ff;font-weight:700;font-family:monospace;font-size:11px">${maxAts}</span></div>
+    <div class="pp-row" style="margin:0"><span style="color:#2a5a7a;font-size:10px">↑ 对应半径</span><span style="color:#60c8ff;font-family:monospace;font-size:10px">${maxAtsR}</span></div>
+    <div class="pp-row" style="margin:0"><span style="color:#2a5a7a;font-size:10px">ATS全库击败</span><span style="color:#60c8ff;font-family:monospace;font-size:10px">${fmtPct(maxAtsRp)}</span></div>
+    <div class="pp-row" style="margin:0"><span style="color:#3a7a5a;font-size:10px">最大Jut峰值</span><span style="color:#40ffa0;font-family:monospace;font-size:10px">${fmtPct(mjxCrp)}</span></div>
+    <div class="pp-row" style="margin:0;border-top:1px solid rgba(90,140,220,.08);padding-top:3px"><span style="color:#6a5a30;font-size:10px">等效突出半径</span><span style="color:#ffd700;font-weight:700;font-family:monospace;font-size:11px">${rProm}</span><span style="margin-left:6px">${confBadge(jutConf,'等效突出半径')}</span></div>
+    <div class="pp-row" style="margin:0;padding-top:2px"><span style="color:#2a5a7a;font-size:10px">等效基座半径</span><span style="color:#60c8ff;font-weight:700;font-family:monospace;font-size:11px">${rBase}</span><span style="margin-left:6px">${confBadge(atsConf,'等效基座半径')}</span></div>
+  </div>
+</div>
+<hr class="pp-sep">
+<div style="display:flex;border-bottom:1px solid rgba(90,140,220,.1);padding:0 12px;gap:1px">
+  <div onclick="switchBandTab('relief','${uid}')" id="btb-relief-${uid}" style="flex:1;padding:4px 0;text-align:center;font-size:10px;color:#80c0ff;border-bottom:2px solid #60a8ff;margin-bottom:-1px;cursor:pointer;font-weight:700">高差段</div>
+  <div onclick="switchBandTab('jut','${uid}')" id="btb-jut-${uid}" style="flex:1;padding:4px 0;text-align:center;font-size:10px;color:#2a5a90;border-bottom:2px solid transparent;margin-bottom:-1px;cursor:pointer">Jut段</div>
+  <div onclick="switchBandTab('ats','${uid}')" id="btb-ats-${uid}" style="flex:1;padding:4px 0;text-align:center;font-size:10px;color:#2a5a90;border-bottom:2px solid transparent;margin-bottom:-1px;cursor:pointer">ATS段</div>
+  <div onclick="switchBandTab('ors','${uid}')" id="btb-ors-${uid}" style="flex:1;padding:4px 0;text-align:center;font-size:10px;color:#2a5a90;border-bottom:2px solid transparent;margin-bottom:-1px;cursor:pointer">ORS段</div>
+</div>
+<div id="bb-relief-${uid}">${bandBarsHtml(p.band_rp,'#80c0ff')}</div>
+<div id="bb-jut-${uid}" style="display:none">${bandBarsHtml(p.band_jut_rp,'#40ffa0')}</div>
+<div id="bb-ats-${uid}" style="display:none">${bandBarsHtml(p.band_ats_rp,'#60c8ff')}</div>
+<div id="bb-ors-${uid}" style="display:none">${bandBarsHtml(p.band_ors_rp,'#ffb04d')}</div>
+${hasC?`
+<hr class="pp-sep" style="margin:3px 0">
+<div class="chart-tabs">
+  <div class="chart-tab active" data-tab="${uid}-r" onclick="switchTab(this,'${uid}')">📈 高差</div>
+  ${hasRk?`<div class="chart-tab" data-tab="${uid}-k" onclick="switchTab(this,'${uid}')">📊 高差排名</div>`:''}
+  ${hasJut?`<div class="chart-tab" data-tab="${uid}-j" onclick="switchTab(this,'${uid}')">🌿 Jut</div>`:''}
+  ${hasJut?`<div class="chart-tab" data-tab="${uid}-jk" onclick="switchTab(this,'${uid}')">📊 Jut排名</div>`:''}
+  <div class="chart-tab" data-tab="${uid}-a" onclick="switchTab(this,'${uid}')">⚡ ATS</div>
+  <div class="chart-tab" data-tab="${uid}-ak" onclick="switchTab(this,'${uid}')">📊 ATS排名</div>
+  ${hasOrs?`<div class="chart-tab" data-tab="${uid}-o" onclick="switchTab(this,'${uid}')">🟠 ORS</div>`:''}
+  ${hasOrs?`<div class="chart-tab" data-tab="${uid}-ok" onclick="switchTab(this,'${uid}')">📊 ORS排名</div>`:''}
+</div>
+<div id="${uid}-r" class="chart-panel active"><div class="chart-leg"><div class="cl-i"><div class="cl-ln" style="background:${cM}"></div><span>平均高差</span></div><div class="cl-i"><div class="cl-ln" style="background:${cX};opacity:.8;border-top:2px dashed ${cX};height:0"></div><span>最大高差</span></div></div><canvas id="${uid}-cr" class="cc"></canvas><div class="chart-note">X：搜索半径 (m) | Y：高差 (m)</div></div>
+${hasRk?`<div id="${uid}-k" class="chart-panel"><canvas id="${uid}-ck" class="cc"></canvas><div class="chart-note">X：搜索半径 | Y：高差排名（Y轴反转）</div></div>`:''}
+${hasJut?`<div id="${uid}-j" class="chart-panel"><div class="chart-leg"><div class="cl-i"><div class="cl-ln" style="background:#40ffa0"></div><span style="color:#3a7a5a">平均Jut</span></div><div class="cl-i"><div class="cl-ln" style="background:#ffd700;opacity:.8;border-top:2px dashed #ffd700;height:0"></div><span style="color:#7a7040">最大Jut</span></div></div><canvas id="${uid}-jc" class="cc"></canvas><div class="chart-note">X：搜索半径 (m) | Y：Jut</div></div>`:''}
+${hasJut?`<div id="${uid}-jk" class="chart-panel"><canvas id="${uid}-jkc" class="cc"></canvas><div class="chart-note">X：搜索半径 | Y：Jut排名（Y轴反转）</div></div>`:''}
+<div id="${uid}-a" class="chart-panel"><div class="chart-leg"><div class="cl-i"><div class="cl-ln" style="background:#60c8ff"></div><span style="color:#2a5a7a">ATS</span></div></div><canvas id="${uid}-ac" class="cc"></canvas><div class="chart-note">X：搜索半径 (m) | Y：ATS</div></div>
+<div id="${uid}-ak" class="chart-panel"><canvas id="${uid}-akc" class="cc"></canvas><div class="chart-note">X：搜索半径 | Y：ATS排名（Y轴反转）</div></div>
+${hasOrs?`<div id="${uid}-o" class="chart-panel"><div class="chart-leg"><div class="cl-i"><div class="cl-ln" style="background:#ff9f40"></div><span style="color:#9b6a24">ORS</span></div></div><canvas id="${uid}-oc" class="cc"></canvas><div class="chart-note">X：搜索半径 (m) | Y：ORS</div></div>`:''}
+${hasOrs?`<div id="${uid}-ok" class="chart-panel"><canvas id="${uid}-okc" class="cc"></canvas><div class="chart-note">X：搜索半径 | Y：ORS排名（Y轴反转）</div></div>`:''}
+`:`<div style="padding:10px 14px;font-size:11px;color:#2a4060;text-align:center">暂无图谱数据</div>`}
+</div>`;
+    if(activePopup) activePopup.remove();
+    activePopup=new maptilersdk.Popup({maxWidth:'520px',closeButton:true,closeOnClick:false,className:'dark-popup'}).setLngLat(coords).setHTML(html).addTo(map);
+    if(hasC) setTimeout(()=>{
+      const atsVals=JSON.parse(p.chart_ats||'[]');
+      const atsRkVals=JSON.parse(p.chart_ats_rk||'[]');
+      const jutRkVals=hasJut&&jProf.jut_ranks?jProf.jut_ranks:[];
+      buildCharts(uid,radii,maxRel,meanRl,meanRk,cM,cX);
+      buildAtsChart(uid,radii,atsVals,atsRkVals);
+      if(hasJut){ buildJutChart(uid,jProf); buildJutRankChart(uid,radii,jutRkVals); }
+      if(hasOrs){ buildOrsChart(uid,orsRadii,orsVals); buildOrsRankChart(uid,orsRadii,orsRanks); }
+    },80);
+  };
+})();
+</script>
+
 </body>
 </html>
