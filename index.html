@@ -388,6 +388,11 @@ canvas.jc{width:100% !important;height:160px !important}
         <div><span class="ds-name">阴山精英库</span><span class="ds-cnt" id="cnt-yinshan_elite"></span></div></div>
       <label class="sw"><input type="checkbox" id="tog-yinshan_elite"><span class="sw-t"></span></label>
     </div>
+    <div class="ds-row">
+      <div class="ds-l"><div class="ds-dot" style="background:#6f8f7c;color:#6f8f7c"></div>
+        <div><span class="ds-name">潢坝精英库</span><span class="ds-cnt" id="cnt-huangba_elite"></span></div></div>
+      <label class="sw"><input type="checkbox" id="tog-huangba_elite"><span class="sw-t"></span></label>
+    </div>
 
     <!-- 新地区行示例（取消注释即可启用）
     <div class="ds-row">
@@ -458,6 +463,7 @@ canvas.jc{width:100% !important;height:160px !important}
       <div class="leg-row"><div class="ds-dot" style="background:#7c3aed;color:#7c3aed"></div><span>泰沂精英库（草绿色系）</span></div>
       <div class="leg-row"><div class="ds-dot" style="background:#2563eb;color:#2563eb"></div><span>胶东精英库（天蓝色系）</span></div>
       <div class="leg-row"><div class="ds-dot" style="background:#c8a84b;color:#c8a84b"></div><span>阴山精英库（黄褐色系）</span></div>
+      <div class="leg-row"><div class="ds-dot" style="background:#6f8f7c;color:#6f8f7c"></div><span>潢坝精英库（灰绿色系）</span></div>
       <div class="leg-row"><div class="ds-dot" style="background:#40c9a2;color:#40c9a2"></div><span>北京周边库（蓝→绿）</span></div>
       <div class="leg-row"><div class="ds-dot" style="background:#a78bfa;color:#a78bfa"></div><span>百里溪库（紫色系）</span></div>
 
@@ -627,6 +633,7 @@ const FILES = {
   taiyi_elite:         'peaks/output_taiyi_elites_geojson/peaks_taiyi_elites.geojson',
   jiaodong_elite:      'peaks/output_jiaodong_elites_geojson/peaks_jiaodong_elites.geojson',
   yinshan_elite:       'peaks/output_yinshan_elites_geojson/peaks_yinshan_elites.geojson',
+  huangba_elite:       'peaks/output_huangba_elites_geojson/peaks_huangba_elites.geojson',
   beijing:             'peaks/output_beijing_geojson/peaks_beijing.geojson',
   bailixi:             'peaks/output_bailixi_geojson/peaks_bailixi.geojson',
 };
@@ -645,6 +652,7 @@ const DS_LABEL = {
   taiyi_elite:         '泰沂精英库',
   jiaodong_elite:         '胶东精英库',
   yinshan_elite:          '阴山精英库',
+  huangba_elite:          '潢坝精英库',
   beijing:             '北京周边库',
   bailixi:             '百里溪库',
 };
@@ -663,13 +671,14 @@ const DS_COLOR = {
   taiyi_elite:           '#7c3aed',
   jiaodong_elite:        '#2563eb',
   yinshan_elite:         '#c8a84b',
+  huangba_elite:         '#6f8f7c',
   beijing:               '#40c9a2',
   bailixi:               '#a78bfa',
 };
 const DS_ZORDER = {
   elite:13, jidong_elite:12, xuanda_elite:11, zhongtaihang_elite:10, nantaihang_elite:9,
   chahar_elite:8, yanba_elite:7, chifeng_elite:6, suishuo_elite:5, lvliangshan_elite:4,
-  fenqin_elite:3, taiyi_elite:2, jiaodong_elite:1, yinshan_elite:0,
+  fenqin_elite:3, taiyi_elite:2, jiaodong_elite:1, yinshan_elite:0, huangba_elite:-1,
   beijing:3, bailixi:2,
 };
 
@@ -688,6 +697,7 @@ const COL = {
   taiyi_elite:         ['interpolate',['linear'],['get','rp'],0,'hsl(272,52%,65%)',0.5,'hsl(268,44%,50%)',1,'hsl(264,38%,36%)'],
   jiaodong_elite:      ['interpolate',['linear'],['get','rp'],0,'hsl(214,88%,68%)',0.5,'hsl(218,78%,52%)',1,'hsl(222,70%,38%)'],
   yinshan_elite:       ['interpolate',['linear'],['get','rp'],0,'hsl(42,80%,65%)',0.5,'hsl(38,72%,50%)',1,'hsl(34,65%,36%)'],
+  huangba_elite:       ['interpolate',['linear'],['get','rp'],0,'hsl(146,12%,66%)',0.5,'hsl(148,14%,50%)',1,'hsl(150,16%,36%)'],
   beijing:             ['interpolate',['linear'],['get','rp'],0,'hsl(220,80%,60%)',0.4,'hsl(165,75%,50%)',0.7,'hsl(55,75%,50%)',1,'hsl(0,75%,50%)'],
   bailixi:             ['interpolate',['linear'],['get','rp'],0,'hsl(260,75%,70%)',0.5,'hsl(285,60%,55%)',1,'hsl(310,65%,45%)'],
 };
@@ -712,6 +722,7 @@ const JUT_SOURCES = {
   taiyi_elite:         { dir: 'peaks/output_taiyi_elites_geojson',           prefix: 'taiyi_elites' },
   jiaodong_elite:      { dir: 'peaks/output_jiaodong_elites_geojson',        prefix: 'jiaodong_elites' },
   yinshan_elite:       { dir: 'peaks/output_yinshan_elites_geojson',         prefix: 'yinshan_elites' },
+  huangba_elite:       { dir: 'peaks/output_huangba_elites_geojson',         prefix: 'huangba_elites' },
 };
 
 const WORKER_URL = 'https://mapbox-proxy.18122920.workers.dev';
@@ -736,7 +747,7 @@ maptilersdk.config.fetch = window.fetch;
 let filterReliefPct = 0, filterJutPct = 0, filterAtsPct = 0, filterOrsPct = 0; // 总体表现筛除（击败率下限，0=不筛）
 let filterMaxJutPct = 0, filterMaxAtsPct = 0; // 峰值筛除（击败率下限，0=不筛）
 let hideWildcard = false; // 隐藏外卡通道山峰
-const ELITE_DS = new Set(['elite','jidong_elite','xuanda_elite','zhongtaihang_elite','nantaihang_elite','chahar_elite','yanba_elite','chifeng_elite','suishuo_elite','lvliangshan_elite','fenqin_elite','taiyi_elite','jiaodong_elite','yinshan_elite']);
+const ELITE_DS = new Set(['elite','jidong_elite','xuanda_elite','zhongtaihang_elite','nantaihang_elite','chahar_elite','yanba_elite','chifeng_elite','suishuo_elite','lvliangshan_elite','fenqin_elite','taiyi_elite','jiaodong_elite','yinshan_elite','huangba_elite']);
 let dotSize = 5, labelsOn = true;
 let activePopup = null, chartInstances = {};
 let activeBands = new Set(), bandMode = 'any', bandThr = 0.15;
@@ -2350,6 +2361,7 @@ const DS_CONFIG = {
   taiyi_elite:      { label:'泰沂精英库',   color:'#7c3aed' },
   jiaodong_elite:      { label:'胶东精英库',   color:'#2563eb' },
   yinshan_elite:       { label:'阴山精英库',   color:'#c8a84b' },
+  huangba_elite:       { label:'潢坝精英库',   color:'#6f8f7c' },
 };
 
 let statsChart = null;

@@ -48,6 +48,7 @@
 | 泰沂精英库 | 116.0°E–119.6°E | 34.8°N–37.0°N | 紫 |
 | 胶东精英库 | 119.6°E–122.8°E | 35.5°N–38.5°N | 蓝 |
 | 阴山精英库 | 108.5°E–111.0°E | 40.2°N–42.2°N | 黄褐 |
+| 潢坝精英库 | 117.0°E–120.0°E | 43.2°N–45.2°N | 灰绿 |
 
 精英库生成流程：
 1. **GEE 提取**：基于 JAXA ALOS AW3D30 V4.1 高程模型，在各研究区域内动态提取局部极大值点，并生成多半径地形统计结果。
@@ -292,9 +293,9 @@ GeoJSON 生成脚本会把各类 CSV 汇总为前端可直接读取的 GeoJSON /
 ## 致谢
 
 - 百里溪库数据来源于前辈 **百里溪** 多年积累的系列山峰记录文章，感谢其无私分享。
-- Jut 指标的概念由 **Kai Xu** 提出，感谢其在山峰形态量化领域的开创性工作，感谢其开发的 PeakJut 网站为全球山峰爱好者带来的探索享受。
-- ORS 理论参考：Edward Earl & David Metzler, *A new topographic functional*
-- 感谢所有热爱山峰量化研究的学者与爱好者，正是这一群体的持续探索推动了地形显著度研究的发展。
+- Jut 指标的概念由 **Kai Xu** 提出，感谢其开创性工作，感谢其开发的 PeakJut 网站为全球山峰爱好者带来的探索享受。
+- ORS 理论参考：**Edward Earl & David Metzler**, *A new topographic functional*
+- 感谢所有热爱山峰量化研究的学者与爱好者，正是这一群体的持续探索推动了山峰评价指标研究的发展。
 - 感谢 GitHub 贡献者 Apiaceae 的开源项目 [geocoder](https://github.com/Apiaceae/geocoder)，为部分无名峰的真实山名修正提供了数据参考。
 - 感谢[高德地图](https://www.amap.com/)、[天地图](https://map.tianditu.gov.cn/)在网页上提供的可供浏览查询的山峰地名数据，为部分无名峰的真实山名修正提供了参考。
 - 感谢[两步路](https://www.2bulu.com/)、[六只脚](https://www.foooooot.com/)上各位驴友提供的轨迹及标注点数据，为部分无名峰的真实山名修正提供了参考。
@@ -302,5 +303,5 @@ GeoJSON 生成脚本会把各类 CSV 汇总为前端可直接读取的 GeoJSON /
 - 地形计算平台：[Google Earth Engine](https://earthengine.google.com/)
 - 地图底图及地形数据：[MapTiler](https://www.maptiler.com/)
 - API 代理服务：[Cloudflare Workers](https://workers.cloudflare.com/)
-- AI辅助理论探索及编程服务：[Claude](https://claude.ai/)、[Gemini](https://aistudio.google.com/)
+- AI辅助理论探索及编程服务：[Claude](https://claude.ai/)、[Gemini](https://aistudio.google.com/)、[ChatGPT](https://chatgpt.com/)
 
