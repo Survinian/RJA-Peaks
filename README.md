@@ -256,6 +256,11 @@ peaks/
   output_taiyi_elites_geojson/             泰沂精英库
   output_jiaodong_elites_geojson/          胶东精英库
   output_yinshan_elites_geojson/           阴山精英库
+  output_huangba_elites_geojson/           潢坝精英库
+  output_liaodong_elites_geojson/          辽东精英库
+  output_qinling_elites_geojson/           秦岭精英库
+  output_changbaishan_elites_geojson/      长白山精英库
+  output_funiushan_elites_geojson/         伏牛山精英库
 ```
 
 每个 `output_*` 目录通常包含：

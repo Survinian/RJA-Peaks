@@ -460,6 +460,10 @@ canvas.jc{width:100% !important;height:160px !important}
       <div class="ds-l"><span style="font-size:10px;color:#4a7aaa">隐藏外卡通道山峰</span><br><span style="font-size:8.5px;color:#2a4060;padding-left:2px">仅显示Step-2达标山峰</span></div>
       <label class="sw"><input type="checkbox" id="cb-hide-wildcard"><span class="sw-t"></span></label>
     </div>
+    <div class="ds-row" style="border-bottom:1px solid rgba(255,255,255,.04);padding-bottom:5px">
+      <div class="ds-l"><span style="font-size:10px;color:#4a7aaa">隐藏未扩充山峰</span><br><span style="font-size:8.5px;color:#2a4060;padding-left:2px">仅显示扩充到 10km 以外的山峰</span></div>
+      <label class="sw"><input type="checkbox" id="cb-hide-unexpanded"><span class="sw-t"></span></label>
+    </div>
     <div class="sl-row">
       <div class="sl-lbl"><span>点大小</span><span class="sv" id="v-size">5</span></div>
       <input type="range" id="sl-size" min="2" max="11" step="0.5" value="5">
@@ -791,6 +795,7 @@ maptilersdk.config.fetch = window.fetch;
 let filterReliefPct = 0, filterJutPct = 0, filterAtsPct = 0, filterOrsPct = 0; // 总体表现筛除（击败率下限，0=不筛）
 let filterMaxJutPct = 0, filterMaxAtsPct = 0; // 峰值筛除（击败率下限，0=不筛）
 let hideWildcard = false; // 隐藏外卡通道山峰
+let hideUnexpanded = false; // 隐藏未扩充山峰
 const ELITE_DS = new Set(['elite','jidong_elite','xuanda_elite','zhongtaihang_elite','nantaihang_elite','chahar_elite','yanba_elite','chifeng_elite','suishuo_elite','lvliangshan_elite','fenqin_elite','taiyi_elite','jiaodong_elite','yinshan_elite','huangba_elite','liaodong_elite','qinling_elite','changbaishan_elite','funiushan_elite']);
 let dotSize = 5, labelsOn = true;
 let activePopup = null, chartInstances = {};
@@ -1815,7 +1820,7 @@ function applyAllCircleFilters(){
 
   // 2. 总体表现+Jut击败率维度：可见山峰名
   const crpJutNames = getCrpJutVisibleNames();
-  const noOvFilter = (filterReliefPct===0 && filterJutPct===0 && filterAtsPct===0 && filterMaxJutPct===0 && filterMaxAtsPct===0 && !hideWildcard);
+  const noOvFilter = (filterReliefPct===0 && filterJutPct===0 && filterAtsPct===0 && filterOrsPct===0 && filterMaxJutPct===0 && filterMaxAtsPct===0 && !hideWildcard && !hideUnexpanded);
   const crpF = noOvFilter ? null : ['in',['get','name'],['literal',[...crpJutNames]]];
 
   // 3. Jut击败率对EPR圆的rank_pct直接过滤
@@ -1876,6 +1881,7 @@ function getCrpJutVisibleNames(){
       const passJut = true;  // Jut全库击败率筛除已移除
       if(passOverall && passJut){
         if(hideWildcard && ELITE_DS.has(ds) && p.channel === 'wildcard') return;
+        if(hideUnexpanded && !p.is_expanded) return;
         visibleNames.add(p.name);
       }
     });
@@ -1945,12 +1951,13 @@ function setupControls(){
       if(hideWildcard && ELITE_DS.has(ds)){
         wcF = ['!=', ['coalesce',['get','channel'],'normal'], 'wildcard'];
       }
+      let expF = null;
+      if(hideUnexpanded){
+        expF = ['==', ['coalesce',['get','is_expanded'], false], true];
+      }
 
-      let fApply;
-      if(f && wcF)       fApply = ['all', wcF, f];
-      else if(f)         fApply = f;
-      else if(wcF)       fApply = wcF;
-      else               fApply = true;
+      const parts = [wcF, expF, f].filter(Boolean);
+      const fApply = parts.length===0 ? true : (parts.length===1 ? parts[0] : ['all', ...parts]);
 
       if(map.getLayer(`dot-${ds}`)) map.setFilter(`dot-${ds}`, fApply);
       if(map.getLayer(`lbl-${ds}`)) map.setFilter(`lbl-${ds}`, fApply);
@@ -1990,6 +1997,10 @@ function setupControls(){
   // 外卡通道开关（标准sw样式，直接监听checkbox change）
   document.getElementById('cb-hide-wildcard').addEventListener('change',e=>{
     hideWildcard = e.target.checked;
+    applyCrpFilter();
+  });
+  document.getElementById('cb-hide-unexpanded').addEventListener('change',e=>{
+    hideUnexpanded = e.target.checked;
     applyCrpFilter();
   });
   document.getElementById('sl-epr-opacity').addEventListener('input',e=>{
@@ -2203,8 +2214,10 @@ function switchBandTab(metric,uid){
   });
 }
 
-function buildCharts(uid,radii,maxRel,meanRl,meanRk,cM,cX){
-  const labels=radii.map(r=>r>=1000?(r/1000).toFixed(r%1000===0?0:1)+'k':String(r));
+function buildCharts(uid,valueRadii,maxRel,meanRl,meanRk,cM,cX,rankRadii=null){
+  const valueR = (Array.isArray(valueRadii)&&valueRadii.length)?valueRadii:[];
+  const rankR = (Array.isArray(rankRadii)&&rankRadii.length)?rankRadii:valueR;
+  const labels=valueR.map(r=>r>=1000?(r/1000).toFixed(r%1000===0?0:1)+'k':String(r));
   const dg={color:'rgba(90,140,220,.06)'};
   const tk={font:{size:9},color:'#2a5a90'};
   const base={responsive:true,maintainAspectRatio:false,animation:{duration:220},plugins:{legend:{display:false}}};
@@ -2219,7 +2232,7 @@ function buildCharts(uid,radii,maxRel,meanRl,meanRk,cM,cX){
        borderWidth:1.4,borderDash:[5,4],tension:.35,fill:false,pointRadius:0,order:2},
     ]},
     options:{...base,plugins:{...base.plugins,tooltip:{mode:'index',intersect:false,...ttBase,
-      callbacks:{title:i=>`半径 ${Number(radii[i[0].dataIndex]).toLocaleString()} m`,
+      callbacks:{title:i=>`半径 ${Number(valueR[i[0].dataIndex]).toLocaleString()} m`,
                  label:i=>`${i.dataset.label}: ${i.raw} m`}}},
       scales:{x:{...tk,grid:dg,ticks:{...tk,maxRotation:40}},
               y:{...tk,grid:dg,title:{display:true,text:'高差 (m)',font:{size:9},color:'#2a5a90'}}}}
@@ -2228,10 +2241,10 @@ function buildCharts(uid,radii,maxRel,meanRl,meanRk,cM,cX){
   if(meanRk.length){
     const ck=document.getElementById(uid+'-ck');
     if(ck) chartInstances[uid+'k']=new Chart(ck,{type:'line',
-      data:{labels,datasets:[{label:'排名',data:meanRk,borderColor:cM,backgroundColor:cM+'12',
+      data:{labels:rankR.map(r=>r>=1000?(r/1000).toFixed(r%1000===0?0:1)+'k':String(r)),datasets:[{label:'排名',data:meanRk,borderColor:cM,backgroundColor:cM+'12',
         borderWidth:2.2,tension:.35,fill:true,pointRadius:3,pointBackgroundColor:cM}]},
       options:{...base,plugins:{...base.plugins,tooltip:{...ttBase,
-        callbacks:{title:i=>`半径 ${Number(radii[i[0].dataIndex]).toLocaleString()} m`,
+        callbacks:{title:i=>`半径 ${Number(rankR[i[0].dataIndex]).toLocaleString()} m`,
                    label:i=>`排名：第 ${i.raw} 名`}}},
         scales:{x:{...tk,grid:dg,ticks:{...tk,maxRotation:40}},
                 y:{reverse:true,...tk,grid:dg,title:{display:true,text:'排名（越小越优）',font:{size:9},color:'#2a5a90'}}}}
@@ -2286,8 +2299,9 @@ function buildJutRankChart(uid, radii, jutRankData){
   });
 }
 
-function buildAtsChart(uid, radii, atsData, atsRankData){
-  const labels = radii.map(r=>r>=1000?(r/1000).toFixed(r%1000===0?0:1)+'k':String(r));
+function buildAtsChart(uid, valueRadii, atsData, atsRankData, rankRadii=null){
+  const labels = valueRadii.map(r=>r>=1000?(r/1000).toFixed(r%1000===0?0:1)+'k':String(r));
+  const rankR = (Array.isArray(rankRadii)&&rankRadii.length)?rankRadii:valueRadii;
   const dg={color:'rgba(0,60,100,.12)'};
   const tk={font:{size:9},color:'#2a5a7a'};
   const base={responsive:true,maintainAspectRatio:false,animation:{duration:220},
@@ -2299,7 +2313,7 @@ function buildAtsChart(uid, radii, atsData, atsRankData){
     data:{labels,datasets:[{label:'ATS(m)',data:atsData,borderColor:'#60c8ff',backgroundColor:'rgba(96,200,255,.1)',
       borderWidth:2.2,tension:.35,fill:true,pointRadius:2,pointBackgroundColor:'#60c8ff'}]},
     options:{...base,plugins:{...base.plugins,tooltip:{mode:'index',intersect:false,...ttBase,
-      callbacks:{title:i=>`半径 ${Number(radii[i[0].dataIndex]).toLocaleString()} m`,
+      callbacks:{title:i=>`半径 ${Number(valueRadii[i[0].dataIndex]).toLocaleString()} m`,
                  label:i=>`ATS: ${i.raw} m`}}},
       scales:{x:{...tk,grid:dg,ticks:{...tk,maxRotation:40}},
               y:{...tk,grid:dg,title:{display:true,text:'ATS (m)',font:{size:9},color:'#2a5a7a'}}}}
@@ -2307,10 +2321,10 @@ function buildAtsChart(uid, radii, atsData, atsRankData){
 
   const akc=document.getElementById(uid+'-akc');
   if(akc&&atsRankData&&atsRankData.length) chartInstances[uid+'ak']=new Chart(akc,{type:'line',
-    data:{labels,datasets:[{label:'ATS排名',data:atsRankData,borderColor:'#60c8ff',backgroundColor:'rgba(96,200,255,.1)',
+    data:{labels:rankR.map(r=>r>=1000?(r/1000).toFixed(r%1000===0?0:1)+'k':String(r)),datasets:[{label:'ATS排名',data:atsRankData,borderColor:'#60c8ff',backgroundColor:'rgba(96,200,255,.1)',
       borderWidth:2.2,tension:.35,fill:true,pointRadius:2,pointBackgroundColor:'#60c8ff'}]},
     options:{...base,plugins:{...base.plugins,tooltip:{mode:'index',intersect:false,...ttBase,
-      callbacks:{title:i=>`半径 ${Number(radii[i[0].dataIndex]).toLocaleString()} m`,
+      callbacks:{title:i=>`半径 ${Number(rankR[i[0].dataIndex]).toLocaleString()} m`,
                  label:i=>`ATS排名：第 ${i.raw} 名`}}},
       scales:{x:{...tk,grid:dg,ticks:{...tk,maxRotation:40}},
               y:{reverse:true,...tk,grid:dg,title:{display:true,text:'ATS排名（越小越优）',font:{size:9},color:'#2a5a7a'}}}}
@@ -2924,11 +2938,15 @@ ${hasOrs?`<div id="${uid}-ok" class="chart-panel"><canvas id="${uid}-okc" class=
     if(hasC) setTimeout(()=>{
       const atsVals=JSON.parse(p.chart_ats||'[]');
       const atsRkVals=JSON.parse(p.chart_ats_rk||'[]');
+      const reliefRankRadii = (()=>{ try{ const a=JSON.parse(p.chart_rk_r||'[]'); return Array.isArray(a)&&a.length?a:radii; }catch{return radii;} })();
+      const atsRankRadii = (()=>{ try{ const a=JSON.parse(p.chart_ats_rk_r||'[]'); return Array.isArray(a)&&a.length?a:radii; }catch{return radii;} })();
       const jutRkVals=hasJut&&jProf.jut_ranks?jProf.jut_ranks:[];
-      buildCharts(uid,radii,maxRel,meanRl,meanRk,cM,cX);
-      buildAtsChart(uid,radii,atsVals,atsRkVals);
-      if(hasJut){ buildJutChart(uid,jProf); buildJutRankChart(uid,radii,jutRkVals); }
-      if(hasOrs){ buildOrsChart(uid,orsRadii,orsVals); buildOrsRankChart(uid,orsRadii,orsRanks); }
+      const jutRankRadii = (hasJut && Array.isArray(jProf.jut_rank_radii) && jProf.jut_rank_radii.length) ? jProf.jut_rank_radii : (()=>{ try{ const a=JSON.parse(p.chart_jut_rk_r||'[]'); return Array.isArray(a)&&a.length?a:radii; }catch{return radii;} })();
+      const orsRankRadii = (hasOrs && Array.isArray(jProf.ors_rank_radii) && jProf.ors_rank_radii.length) ? jProf.ors_rank_radii : (()=>{ try{ const a=JSON.parse(p.chart_ors_rk_r||'[]'); return Array.isArray(a)&&a.length?a:orsRadii; }catch{return orsRadii;} })();
+      buildCharts(uid,radii,maxRel,meanRl,meanRk,cM,cX,reliefRankRadii);
+      buildAtsChart(uid,radii,atsVals,atsRkVals,atsRankRadii);
+      if(hasJut){ buildJutChart(uid,jProf); buildJutRankChart(uid,jutRankRadii,jutRkVals); }
+      if(hasOrs){ buildOrsChart(uid,orsRadii,orsVals); buildOrsRankChart(uid,orsRankRadii,orsRanks); }
     },80);
   };
 })();
