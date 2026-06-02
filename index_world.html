@@ -1,0 +1,3193 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>世界山峰 · 世界山峰地图</title>
+<script src="https://cdn.maptiler.com/maptiler-sdk-js/v2.0.3/maptiler-sdk.umd.min.js"></script>
+<link href="https://cdn.maptiler.com/maptiler-sdk-js/v2.0.3/maptiler-sdk.css" rel="stylesheet">
+<link  rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+*,*::before,*::after{box-sizing:border-box}
+body{margin:0;padding:0;font-family:-apple-system,"Noto Sans SC",sans-serif;overflow:hidden;background:#090f1c}
+#map{position:absolute;top:0;bottom:0;width:100%}
+:root{
+  --bp-panel-right:18px;
+  --bp-panel-width:242px;
+  --ctrl-safe-gap:14px;
+  --right-panel-avoid:calc(var(--bp-panel-right) + var(--bp-panel-width) + var(--ctrl-safe-gap));
+}
+
+/* 右侧筛选面板避让：避免与地图右侧控件（缩放/罗盘）遮挡 */
+.mapboxgl-ctrl-top-right,.maptilergl-ctrl-top-right,.maplibregl-ctrl-top-right,
+.mapboxgl-ctrl-bottom-right,.maptilergl-ctrl-bottom-right,.maplibregl-ctrl-bottom-right{
+  right:var(--right-panel-avoid) !important;
+}
+
+@media (max-width:1100px){
+  :root{
+    --bp-panel-right:18px;
+    --bp-panel-width:242px;
+    --ctrl-safe-gap:10px;
+    --right-panel-avoid:calc(var(--bp-panel-right) + var(--bp-panel-width) + var(--ctrl-safe-gap));
+  }
+}
+
+/* ══ 通用开关 ══ */
+.sw{position:relative;display:inline-block;width:36px;height:19px;flex-shrink:0}
+.sw input{opacity:0;width:0;height:0}
+.sw-t{position:absolute;cursor:pointer;inset:0;background:#162030;border:1px solid rgba(90,140,220,.2);transition:.25s;border-radius:19px}
+.sw-t::before{position:absolute;content:"";height:13px;width:13px;left:2px;bottom:2px;background:#2a4060;transition:.25s;border-radius:50%}
+input:checked+.sw-t{background:#1a4a8a;border-color:rgba(80,160,255,.45)}
+input:checked+.sw-t::before{transform:translateX(17px);background:#60a8ff}
+
+/* ══ 通用滑块 ══ */
+input[type=range]{-webkit-appearance:none;width:100%;height:3px;background:rgba(90,140,220,.18);border-radius:3px;cursor:pointer;outline:none}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:13px;height:13px;border-radius:50%;background:#60a8ff;box-shadow:0 0 5px rgba(96,168,255,.6);cursor:pointer}
+
+/* ══ 面板通用壳 ══ */
+.panel{
+  position:absolute;
+  background:rgba(9,15,30,.94);backdrop-filter:blur(18px) saturate(150%);
+  border:1px solid rgba(90,140,220,.18);border-radius:14px;
+  box-shadow:0 12px 48px rgba(0,0,0,.55),inset 0 1px 0 rgba(255,255,255,.05);
+  z-index:10;overflow:hidden;color:#c8d8f0;
+}
+.panel-hd{
+  padding:11px 14px 9px;flex-shrink:0;
+  background:linear-gradient(135deg,rgba(16,44,90,.85),rgba(6,18,44,.95));
+  border-bottom:1px solid rgba(90,140,220,.14);
+}
+.panel-hd h2{margin:0;font-size:13px;font-weight:700;color:#ddeeff;letter-spacing:.2px}
+.panel-hd p {margin:2px 0 0;font-size:9px;color:#3a6aaa;letter-spacing:.6px;text-transform:uppercase}
+.panel-body{padding:10px 13px;overflow-y:auto}
+.panel-body::-webkit-scrollbar{width:3px}
+.panel-body::-webkit-scrollbar-thumb{background:rgba(90,140,220,.2);border-radius:3px}
+
+.sec{font-size:9px;letter-spacing:2px;text-transform:uppercase;color:#2a5a90;
+  margin:11px 0 6px;padding-bottom:3px;border-bottom:1px solid rgba(90,140,220,.1)}
+.sec:first-child{margin-top:0}
+
+/* 数据集行 */
+.ds-row{display:flex;align-items:center;justify-content:space-between;
+  padding:6px 0;border-bottom:1px solid rgba(255,255,255,.04)}
+.ds-l{display:flex;align-items:center;gap:7px}
+.ds-dot{width:9px;height:9px;border-radius:50%;flex-shrink:0;box-shadow:0 0 5px currentColor}
+.ds-name{font-size:11.5px;color:#b0c8e8}
+.ds-cnt{font-size:9.5px;color:#2a4060;margin-left:2px}
+
+/* 滑块行 */
+.sl-row{padding:6px 0;border-bottom:1px solid rgba(255,255,255,.04)}
+.sl-lbl{display:flex;justify-content:space-between;font-size:10px;color:#4a6a90;margin-bottom:3px}
+.sl-lbl .sv{color:#60a8ff;font-weight:700}
+
+/* 图例 */
+.grad-wrap{display:flex;align-items:center;gap:5px;font-size:9.5px;color:#2a4060;margin-top:5px}
+.grad-bar{flex:1;height:5px;border-radius:3px;background:linear-gradient(to right,hsl(220,80%,56%),hsl(165,75%,50%),hsl(110,70%,46%),hsl(55,75%,50%),hsl(0,75%,52%))}
+.leg-row{display:flex;align-items:center;gap:6px;font-size:10px;color:#2a5a90;margin-top:4px}
+.footnote{font-size:9px;color:#182030;text-align:center;margin-top:8px;line-height:1.7}
+
+/* ══ 检索框 ══ */
+.search-wrap{
+  position:relative;margin-bottom:8px;
+  border-bottom:1px solid rgba(90,140,220,.1);padding-bottom:9px;
+}
+.search-input-row{display:flex;align-items:center;gap:6px}
+.search-ico{color:#3a6aaa;font-size:12px;flex-shrink:0}
+#search-input{
+  flex:1;background:rgba(255,255,255,.04);border:1px solid rgba(90,140,220,.2);
+  border-radius:7px;padding:5px 9px;font-size:11.5px;color:#c0d8f0;outline:none;
+  transition:border-color .2s;
+}
+#search-input:focus{border-color:rgba(80,160,255,.5);background:rgba(255,255,255,.06)}
+#search-input::placeholder{color:#2a4060}
+.search-clear{
+  width:20px;height:20px;border-radius:50%;background:rgba(90,140,220,.15);
+  border:none;color:#4a6aaa;cursor:pointer;font-size:10px;display:none;
+  align-items:center;justify-content:center;flex-shrink:0;transition:.2s;
+}
+.search-clear:hover{background:rgba(90,140,220,.3);color:#80b0f0}
+.search-clear.vis{display:flex}
+/* 下拉候选 */
+#search-dropdown{
+  position:absolute;top:calc(100% - 5px);left:0;right:0;
+  background:rgba(9,18,38,.97);border:1px solid rgba(90,140,220,.25);
+  border-radius:0 0 9px 9px;border-top:none;
+  max-height:220px;overflow-y:auto;z-index:50;display:none;
+}
+#search-dropdown.vis{display:block}
+#search-dropdown::-webkit-scrollbar{width:3px}
+#search-dropdown::-webkit-scrollbar-thumb{background:rgba(90,140,220,.2);border-radius:3px}
+.sd-item{
+  display:flex;align-items:center;gap:7px;
+  padding:6px 10px;cursor:pointer;border-bottom:1px solid rgba(90,140,220,.08);
+  transition:background .15s;font-size:11px;
+}
+.sd-item:last-child{border-bottom:none}
+.sd-item:hover,.sd-item.focused{background:rgba(80,160,255,.12)}
+.sd-name{color:#c0d8f0;font-weight:600;flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sd-src{font-size:9px;padding:1px 6px;border-radius:10px;white-space:nowrap;flex-shrink:0}
+.sd-elev{font-size:9.5px;color:#2a4060;flex-shrink:0}
+.sd-none{padding:10px;text-align:center;color:#2a4060;font-size:11px}
+
+/* ══ 距离段筛选面板（右侧） ══ */
+.bp-hd-row{display:flex;align-items:center;justify-content:space-between;gap:6px}
+.bp-clear{font-size:9px;padding:2px 8px;border-radius:20px;cursor:pointer;
+  background:rgba(90,140,220,.1);color:#60a8ff;border:1px solid rgba(90,140,220,.2);
+  transition:.2s;white-space:nowrap}
+.bp-clear:hover{background:rgba(90,140,220,.22)}
+
+/* 距离段条目 */
+.band-item{
+  display:flex;align-items:stretch;margin-bottom:4px;
+  border:1px solid rgba(90,140,220,.1);border-radius:7px;overflow:hidden;
+  cursor:pointer;transition:border-color .2s,background .2s;
+}
+.band-item:last-of-type{margin-bottom:0}
+.band-item:hover{border-color:rgba(90,140,220,.3)}
+.band-item.on{border-color:rgba(80,160,255,.5);background:rgba(30,70,140,.12)}
+.band-cb-cell{padding:0 8px;display:flex;align-items:center;border-right:1px solid rgba(90,140,220,.1);background:rgba(255,255,255,.01)}
+input.band-cb{width:12px;height:12px;cursor:pointer;accent-color:#60a8ff}
+.band-info{flex:1;padding:5px 8px}
+.band-name{font-size:11px;color:#90b0d8;font-weight:600;line-height:1.2}
+.band-range{font-size:8.5px;color:#2a4060}
+.band-item.on .band-name{color:#80c0ff}
+
+/* 阈值区 */
+.thr-row{margin-top:7px;padding-top:7px;border-top:1px solid rgba(90,140,220,.1)}
+.thr-presets{display:flex;gap:4px;margin-top:5px;flex-wrap:wrap}
+.thr-btn{
+  font-size:10px;padding:3px 8px;border-radius:5px;cursor:pointer;
+  background:rgba(255,255,255,.03);color:#3a6aaa;
+  border:1px solid rgba(90,140,220,.18);transition:.2s;
+}
+.thr-btn:hover{background:rgba(80,160,255,.12);color:#80b0f0}
+.thr-btn.on{background:rgba(80,160,255,.2);color:#a0d0ff;border-color:rgba(80,160,255,.4)}
+
+/* 模式按钮 */
+.mode-row{display:none;gap:4px;margin-top:7px}
+.mode-row.vis{display:flex}
+.mode-btn{flex:1;font-size:10px;padding:4px 0;border-radius:6px;text-align:center;cursor:pointer;
+  border:1px solid rgba(90,140,220,.18);color:#3a6aaa;background:rgba(255,255,255,.02);transition:.2s}
+.mode-btn.on{background:rgba(80,160,255,.18);color:#80c0ff;border-color:rgba(80,160,255,.4)}
+.mode-btn:hover:not(.on){background:rgba(80,160,255,.1)}
+/* 指标选择按钮 */
+.metric-btn{flex:1;font-size:10px;padding:3px 0;border-radius:6px;text-align:center;cursor:pointer;
+  border:1px solid rgba(90,140,220,.18);color:#3a6aaa;background:rgba(255,255,255,.02);transition:.2s}
+.metric-btn.on{background:rgba(80,160,255,.22);color:#90d0ff;border-color:rgba(80,160,255,.5);font-weight:700}
+.metric-btn:hover:not(.on){background:rgba(80,160,255,.1)}
+
+/* 统计条 */
+.bp-stats{display:none;margin-top:7px;padding:6px 9px;
+  background:rgba(80,160,255,.06);border:1px solid rgba(80,160,255,.12);
+  border-radius:7px;align-items:center;justify-content:space-between}
+.bp-stats.vis{display:flex}
+.bp-stats .cnt{font-size:17px;font-weight:700;color:#60a8ff;line-height:1}
+.bp-stats-r{text-align:right;font-size:9px;color:#2a4060;line-height:1.6}
+.bp-stats-r span{color:#60a8ff;font-weight:700}
+
+/* ══ 弹窗 ══ */
+/* ── Popup 容器：覆盖MapTiler SDK所有可能的类名 ── */
+.mapboxgl-popup,.maptilergl-popup,[class*="popup"]{max-width:460px !important}
+.mapboxgl-popup-content,.maptilergl-popup-content,[class*="popup-content"]{
+  padding:0 !important;border-radius:12px !important;overflow:hidden !important;
+  box-shadow:0 8px 40px rgba(0,0,0,.5) !important;background:#0b1628 !important;
+  border:1px solid rgba(90,140,220,.18) !important}
+/* 弹窗小三角 */
+.mapboxgl-popup-tip,.maptilergl-popup-tip,[class*="popup-tip"]{
+  border-top-color:#0b1628 !important;border-bottom-color:#0b1628 !important;
+  border-left-color:transparent !important;border-right-color:transparent !important}
+/* 关闭按钮 */
+.mapboxgl-popup-close-button,.maptilergl-popup-close-button,[class*="popup-close"]{
+  color:#4060a0 !important;font-size:18px;padding:6px 10px;
+  top:2px;right:2px;background:none !important;border:none !important;
+  z-index:10}
+.mapboxgl-popup-close-button:hover,.maptilergl-popup-close-button:hover,[class*="popup-close"]:hover{color:#a0c0f0}
+/* pp-wrap：确保内容本身也是深色圆角，双重保险 */
+.pp-wrap{
+  background:#0b1628;border-radius:12px;overflow:hidden;
+  display:block;width:100%}
+/* dark-popup：精确覆盖SDK生成的popup容器 */
+.dark-popup .mapboxgl-popup-content,
+.dark-popup .maptilergl-popup-content,
+.dark-popup [class*="popup-content"]{
+  background:#0b1628 !important;border-radius:12px !important;
+  overflow:hidden !important;padding:0 !important;
+  border:1px solid rgba(90,140,220,.18) !important;
+  box-shadow:0 8px 40px rgba(0,0,0,.6) !important}
+.dark-popup .mapboxgl-popup-tip,
+.dark-popup .maptilergl-popup-tip,
+.dark-popup [class*="popup-tip"]{
+  border-top-color:#0b1628 !important;
+  border-bottom-color:#0b1628 !important}
+.dark-popup .mapboxgl-popup-close-button,
+.dark-popup .maptilergl-popup-close-button,
+.dark-popup [class*="popup-close"]{
+  color:#4060a0 !important;background:none !important;border:none !important}
+.pp-hd{padding:10px 14px;font-size:14px;font-weight:700;color:#ddeeff;
+  display:flex;align-items:center;justify-content:space-between;gap:7px;
+  background:linear-gradient(135deg,rgba(10,24,54,.97),rgba(5,13,32,.97))}
+.pp-src{font-size:9.5px;font-weight:500;border-radius:20px;padding:2px 9px;white-space:nowrap}
+.pp-body{padding:8px 14px 4px}
+.pp-row{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:4px;font-size:11.5px;color:#4870a0}
+.pp-val{font-weight:700;font-family:monospace;font-size:12.5px;color:#88b8f0}
+.pp-sep{border:none;border-top:1px solid rgba(90,140,220,.1);margin:5px 0}
+/* 距离段条 */
+.pp-bands{padding:4px 14px 8px;display:flex;flex-direction:column;gap:2px}
+.pp-band-r{display:flex;align-items:center;gap:5px}
+.pp-band-l{font-size:9px;color:#2a4060;width:52px;flex-shrink:0;text-align:right}
+.pp-bar-w{flex:1;height:5px;background:rgba(255,255,255,.05);border-radius:3px;overflow:hidden}
+.pp-bar{height:100%;border-radius:3px;transition:width .3s}
+.pp-band-v{font-size:9px;width:32px;text-align:right;flex-shrink:0;font-variant-numeric:tabular-nums}
+.pp-star{width:13px;text-align:center;flex-shrink:0;font-size:10px}
+/* 折线图 */
+.chart-tabs{display:flex;border-bottom:1px solid rgba(90,140,220,.12);margin:0 12px}
+.chart-tab{flex:1;padding:6px 3px;text-align:center;font-size:11px;color:#2a5a90;cursor:pointer;
+  border-bottom:2px solid transparent;margin-bottom:-1px;transition:.2s;user-select:none}
+.chart-tab.active{color:#80c0ff;border-bottom-color:#60a8ff;font-weight:700}
+.chart-panel{display:none;padding:7px 12px 10px}
+.chart-panel.active{display:block}
+canvas.cc{width:100% !important;height:165px !important}
+.chart-note{font-size:9px;color:#1a2a40;text-align:center;margin-top:2px;line-height:1.5}
+.chart-leg{display:flex;gap:10px;justify-content:center;margin-bottom:4px;flex-wrap:wrap}
+.cl-i{display:flex;align-items:center;gap:4px;font-size:9.5px;color:#2a5a90}
+.cl-ln{width:16px;height:2px;border-radius:2px;flex-shrink:0}
+/* Jut base popup */
+.jut-hd{padding:10px 14px;font-size:13px;font-weight:700;color:#a0ffd0;
+  background:linear-gradient(135deg,rgba(0,40,30,.97),rgba(0,20,15,.97));
+  display:flex;align-items:center;justify-content:space-between;gap:7px}
+.jut-badge{font-size:9.5px;font-weight:500;border-radius:20px;padding:2px 9px;
+  background:rgba(0,255,150,.12);color:#40ffb0;border:1px solid rgba(0,255,150,.3);white-space:nowrap}
+.jut-body{padding:8px 14px 10px}
+.jut-row{display:flex;justify-content:space-between;align-items:baseline;
+  margin-bottom:5px;font-size:11.5px;color:#3a6a5a}
+.jut-val{font-weight:700;font-family:monospace;font-size:12.5px;color:#40ffa0}
+.jut-chart-wrap{padding:0 12px 10px}
+canvas.jc{width:100% !important;height:160px !important}
+/* 加载 */
+#loading{position:fixed;inset:0;background:#090f1c;display:flex;flex-direction:column;
+  align-items:center;justify-content:center;z-index:999;gap:11px;transition:opacity .5s}
+.ld-icon{font-size:30px;color:#1a3a6a;animation:pulse 1.5s ease-in-out infinite}
+.ld-title{font-size:13px;color:#60a8ff;letter-spacing:2px}
+.ld-bw{width:140px;height:3px;background:rgba(90,140,220,.12);border-radius:3px;overflow:hidden}
+.ld-b{height:100%;width:0%;background:linear-gradient(90deg,#1a4a8a,#60a8ff);border-radius:3px;transition:width .3s}
+.ld-sub{font-size:9.5px;color:#2a3a50;letter-spacing:.8px}
+@keyframes pulse{0%,100%{opacity:.3}50%{opacity:1}}
+</style>
+</head>
+<body>
+<div id="loading">
+  <i class="fas fa-mountain ld-icon"></i>
+  <div class="ld-title">世界山峰地图加载中</div>
+  <div class="ld-bw"><div class="ld-b" id="ld-b"></div></div>
+  <div class="ld-sub" id="ld-msg">初始化…</div>
+</div>
+<div id="map"></div>
+
+<!-- ══ 左侧栏 ══ -->
+<div class="panel" style="top:18px;left:18px;width:280px;max-height:94vh;display:flex;flex-direction:column">
+  <div class="panel-hd">
+    <h2><i class="fas fa-mountain" style="margin-right:6px;color:#4080ff;font-size:12px"></i>世界山峰 · 世界山峰地图</h2>
+    <p>World Peaks · Multi-Source Map</p>
+  </div>
+  <div class="panel-body" style="flex:1">
+
+    <!-- 检索 -->
+    <div class="sec"><i class="fas fa-magnifying-glass" style="margin-right:4px"></i>山峰检索</div>
+    <div class="search-wrap">
+      <div class="search-input-row">
+        <i class="fas fa-search search-ico"></i>
+        <input id="search-input" type="text" placeholder="输入山峰名">
+        <button class="search-clear" id="search-clear" onclick="clearSearch()"><i class="fas fa-times"></i></button>
+      </div>
+      <div id="search-dropdown"></div>
+    </div>
+
+    <!-- 数据集 -->
+    <div class="sec"><i class="fas fa-database" style="margin-right:4px"></i>数据集
+      <button id="btn-stats-modal" onclick="openStatsModal()" style="float:right;margin-top:-1px;padding:2px 8px;font-size:9px;background:rgba(64,200,162,.15);color:#40c9a2;border:1px solid rgba(64,200,162,.3);border-radius:8px;cursor:pointer;letter-spacing:.3px">📊 总述图表</button>
+    </div>
+    <div class="ds-row">
+      <div class="ds-l"><div class="ds-dot" style="background:#40c9a2;color:#40c9a2"></div>
+        <div><span class="ds-name">世界Ribus/P1000库</span><span class="ds-cnt" id="cnt-ribus_p1000"></span></div></div>
+      <label class="sw"><input type="checkbox" id="tog-ribus_p1000" checked><span class="sw-t"></span></label>
+    </div>
+    <div class="ds-row">
+      <div class="ds-l"><div class="ds-dot" style="background:#40c9a2;color:#40c9a2"></div>
+        <div><span class="ds-name">亚洲J1000库</span><span class="ds-cnt" id="cnt-asia_j1000"></span></div></div>
+      <label class="sw"><input type="checkbox" id="tog-asia_j1000"><span class="sw-t"></span></label>
+    </div>
+    <div class="ds-row">
+      <div class="ds-l"><div class="ds-dot" style="background:#40c9a2;color:#40c9a2"></div>
+        <div><span class="ds-name">欧洲J1000库</span><span class="ds-cnt" id="cnt-europe_j1000"></span></div></div>
+      <label class="sw"><input type="checkbox" id="tog-europe_j1000"><span class="sw-t"></span></label>
+    </div>
+    <div class="ds-row">
+      <div class="ds-l"><div class="ds-dot" style="background:#40c9a2;color:#40c9a2"></div>
+        <div><span class="ds-name">北美洲J800库</span><span class="ds-cnt" id="cnt-north_america_j800"></span></div></div>
+      <label class="sw"><input type="checkbox" id="tog-north_america_j800"><span class="sw-t"></span></label>
+    </div>
+    <div class="ds-row">
+      <div class="ds-l"><div class="ds-dot" style="background:#40c9a2;color:#40c9a2"></div>
+        <div><span class="ds-name">南美洲J800库</span><span class="ds-cnt" id="cnt-south_america_j800"></span></div></div>
+      <label class="sw"><input type="checkbox" id="tog-south_america_j800"><span class="sw-t"></span></label>
+    </div>
+    <div class="ds-row">
+      <div class="ds-l"><div class="ds-dot" style="background:#40c9a2;color:#40c9a2"></div>
+        <div><span class="ds-name">非洲J250库</span><span class="ds-cnt" id="cnt-africa_j250"></span></div></div>
+      <label class="sw"><input type="checkbox" id="tog-africa_j250"><span class="sw-t"></span></label>
+    </div>
+    <div class="ds-row">
+      <div class="ds-l"><div class="ds-dot" style="background:#40c9a2;color:#40c9a2"></div>
+        <div><span class="ds-name">大洋洲J250库</span><span class="ds-cnt" id="cnt-oceania_j250"></span></div></div>
+      <label class="sw"><input type="checkbox" id="tog-oceania_j250"><span class="sw-t"></span></label>
+    </div>
+    <div class="ds-row">
+      <div class="ds-l"><div class="ds-dot" style="background:#40c9a2;color:#40c9a2"></div>
+        <div><span class="ds-name">南极洲J250库</span><span class="ds-cnt" id="cnt-antarctica_j250"></span></div></div>
+      <label class="sw"><input type="checkbox" id="tog-antarctica_j250"><span class="sw-t"></span></label>
+    </div>
+    <div class="ds-row">
+      <div class="ds-l"><div class="ds-dot" style="background:#40c9a2;color:#40c9a2"></div>
+        <div><span class="ds-name">高亚洲E5800&amp;P950库</span><span class="ds-cnt" id="cnt-highasia_e5800_p950"></span></div></div>
+      <label class="sw"><input type="checkbox" id="tog-highasia_e5800_p950"><span class="sw-t"></span></label>
+    </div>
+    <div class="ds-row">
+      <div class="ds-l"><div class="ds-dot" style="background:#40c9a2;color:#40c9a2"></div>
+        <div><span class="ds-name">东南亚GB库</span><span class="ds-cnt" id="cnt-southeast_asia_gb"></span></div></div>
+      <label class="sw"><input type="checkbox" id="tog-southeast_asia_gb"><span class="sw-t"></span></label>
+    </div>
+    <div class="ds-row">
+      <div class="ds-l"><div class="ds-dot" style="background:#40c9a2;color:#40c9a2"></div>
+        <div><span class="ds-name">日本百名山库</span><span class="ds-cnt" id="cnt-japan_100peaks"></span></div></div>
+      <label class="sw"><input type="checkbox" id="tog-japan_100peaks"><span class="sw-t"></span></label>
+    </div>
+    <div class="ds-row">
+      <div class="ds-l"><div class="ds-dot" style="background:#40c9a2;color:#40c9a2"></div>
+        <div><span class="ds-name">日本J250库</span><span class="ds-cnt" id="cnt-japan_j250"></span></div></div>
+      <label class="sw"><input type="checkbox" id="tog-japan_j250"><span class="sw-t"></span></label>
+    </div>
+    <div class="ds-row">
+      <div class="ds-l"><div class="ds-dot" style="background:#40c9a2;color:#40c9a2"></div>
+        <div><span class="ds-name">朝鲜半岛J250库</span><span class="ds-cnt" id="cnt-korea_j250"></span></div></div>
+      <label class="sw"><input type="checkbox" id="tog-korea_j250"><span class="sw-t"></span></label>
+    </div>
+    <div class="ds-row">
+      <div class="ds-l"><div class="ds-dot" style="background:#40c9a2;color:#40c9a2"></div>
+        <div><span class="ds-name">马来西亚P110库</span><span class="ds-cnt" id="cnt-malaysia_prominence_110peaks"></span></div></div>
+      <label class="sw"><input type="checkbox" id="tog-malaysia_prominence_110peaks"><span class="sw-t"></span></label>
+    </div>
+
+    <!-- 显示选项 -->
+    <div class="sec" style="margin-top:11px"><i class="fas fa-sliders" style="margin-right:4px"></i>显示选项</div>
+    <div class="ds-row">
+      <div class="ds-l"><i class="fas fa-tag" style="color:#4080ff;font-size:10px;width:9px"></i>
+        <span class="ds-name">开启名称标签</span></div>
+      <label class="sw"><input type="checkbox" id="tog-labels" checked><span class="sw-t"></span></label>
+    </div>
+    <div class="ds-row">
+      <div class="ds-l"><i class="fas fa-language" style="color:#80c0ff;font-size:10px;width:9px"></i>
+        <span class="ds-name">当地名称/英文名称</span></div>
+      <label class="sw"><input type="checkbox" id="tog-english-names"><span class="sw-t"></span></label>
+    </div>
+    <!-- 总体表现筛除 -->
+    <div class="sec" style="margin-top:8px"><i class="fas fa-filter" style="margin-right:4px;color:#80c0ff"></i>总体表现筛除（击败率 ≥ 阈值才显示）</div>
+    <div class="sl-row">
+      <div class="sl-lbl"><span>高差总体表现</span><span class="sv" id="v-filter-relief">不筛除</span></div>
+      <input type="range" id="sl-filter-relief" min="0" max="95" step="5" value="0">
+    </div>
+    <div class="sl-row">
+      <div class="sl-lbl"><span>平均Jut总体表现</span><span class="sv" id="v-filter-jut">不筛除</span></div>
+      <input type="range" id="sl-filter-jut" min="0" max="95" step="5" value="0">
+    </div>
+    <div class="sl-row">
+      <div class="sl-lbl"><span>ATS总体表现</span><span class="sv" id="v-filter-ats">不筛除</span></div>
+      <input type="range" id="sl-filter-ats" min="0" max="95" step="5" value="0">
+    </div>
+    <div class="sl-row">
+      <div class="sl-lbl"><span>34kmORS表现</span><span class="sv" id="v-filter-ors">不筛除</span></div>
+      <input type="range" id="sl-filter-ors" min="0" max="95" step="5" value="0">
+    </div>
+    <div class="sl-row">
+      <div class="sl-lbl"><span>最大Jut峰值表现</span><span class="sv" id="v-filter-maxjut">不筛除</span></div>
+      <input type="range" id="sl-filter-maxjut" min="0" max="95" step="5" value="0">
+    </div>
+    <div class="sl-row">
+      <div class="sl-lbl"><span>最大ATS峰值表现</span><span class="sv" id="v-filter-maxats">不筛除</span></div>
+      <input type="range" id="sl-filter-maxats" min="0" max="95" step="5" value="0">
+    </div>
+    <div style="font-size:9px;color:#2a4060;margin-top:-4px;margin-bottom:4px;line-height:1.5">以上六项取并集（满足任一即显示）</div>
+    <div class="sl-row">
+      <div class="sl-lbl"><span>点大小</span><span class="sv" id="v-size">5</span></div>
+      <input type="range" id="sl-size" min="2" max="11" step="0.5" value="5">
+    </div>
+
+    <!-- 图例 -->
+    <div style="margin-top:9px;padding-top:8px;border-top:1px solid rgba(90,140,220,.1)">
+      <div style="font-size:9px;color:#2a5a90;font-weight:700;letter-spacing:.6px;text-transform:uppercase;margin-bottom:4px">颜色：库内综合排名百分率</div>
+      <div class="grad-wrap"><span>前列</span><div class="grad-bar"></div><span>末位</span></div>
+      <div class="leg-row"><div class="ds-dot" style="background:#40c9a2;color:#40c9a2"></div><span>世界Ribus/P1000库</span></div>
+      <div class="leg-row"><div class="ds-dot" style="background:#40c9a2;color:#40c9a2"></div><span>亚洲J1000库</span></div>
+      <div class="leg-row"><div class="ds-dot" style="background:#40c9a2;color:#40c9a2"></div><span>欧洲J1000库</span></div>
+      <div class="leg-row"><div class="ds-dot" style="background:#40c9a2;color:#40c9a2"></div><span>北美洲J800库</span></div>
+      <div class="leg-row"><div class="ds-dot" style="background:#40c9a2;color:#40c9a2"></div><span>南美洲J800库</span></div>
+      <div class="leg-row"><div class="ds-dot" style="background:#40c9a2;color:#40c9a2"></div><span>非洲J250库</span></div>
+      <div class="leg-row"><div class="ds-dot" style="background:#40c9a2;color:#40c9a2"></div><span>大洋洲J250库</span></div>
+      <div class="leg-row"><div class="ds-dot" style="background:#40c9a2;color:#40c9a2"></div><span>南极洲J250库</span></div>
+      <div class="leg-row"><div class="ds-dot" style="background:#40c9a2;color:#40c9a2"></div><span>高亚洲E5800&amp;P950库</span></div>
+      <div class="leg-row"><div class="ds-dot" style="background:#40c9a2;color:#40c9a2"></div><span>东南亚GB库</span></div>
+      <div class="leg-row"><div class="ds-dot" style="background:#40c9a2;color:#40c9a2"></div><span>日本百名山库</span></div>
+      <div class="leg-row"><div class="ds-dot" style="background:#40c9a2;color:#40c9a2"></div><span>日本J250库</span></div>
+      <div class="leg-row"><div class="ds-dot" style="background:#40c9a2;color:#40c9a2"></div><span>朝鲜半岛J250库</span></div>
+      <div class="leg-row"><div class="ds-dot" style="background:#40c9a2;color:#40c9a2"></div><span>马来西亚P110库</span></div>
+    </div>
+    <div class="footnote">点击山峰查看高差、Jut、ATS 与 ORS 曲线<br>世界库默认采用 0–34km 全段统计<br>34kmORS 用于替代国内版 10kmORS</div>
+
+    <!-- 响应半径图层控制 -->
+    <div class="sec" style="margin-top:11px"><i class="fas fa-eye" style="margin-right:4px;color:#40ffa0"></i>响应半径图层</div>
+    <div class="ds-row">
+      <div class="ds-l"><div class="ds-dot" style="background:#40ffa0;color:#40ffa0"></div>
+        <span class="ds-name">Base 点</span></div>
+      <label class="sw"><input type="checkbox" id="tog-jut-base"><span class="sw-t"></span></label>
+    </div>
+    <div class="ds-row">
+      <div class="ds-l"><div class="ds-dot" style="background:#facc15;color:#facc15"></div>
+        <span class="ds-name">平均突起响应半径圆</span></div>
+      <label class="sw"><input type="checkbox" id="tog-jmean-peak"><span class="sw-t"></span></label>
+    </div>
+    <div class="ds-row">
+      <div class="ds-l"><div class="ds-dot" style="background:#60c8ff;color:#60c8ff"></div>
+        <span class="ds-name">ATS峰值响应半径圆</span></div>
+      <label class="sw"><input type="checkbox" id="tog-ats-peak-circle"><span class="sw-t"></span></label>
+    </div>
+    <div class="ds-row">
+      <div class="ds-l"><div class="ds-dot" style="background:#ffb347;color:#ffb347"></div>
+        <span class="ds-name">ATS最大边际响应半径圆</span></div>
+      <label class="sw"><input type="checkbox" id="tog-ats-marginal-circle"><span class="sw-t"></span></label>
+    </div>
+    <!-- 平均突起响应圆透明度滑块 -->
+    <div class="sl-row">
+      <div class="sl-lbl"><span>平均突起响应圆透明度</span><span class="sv" id="v-jmean-peak-opacity">35%</span></div>
+      <input type="range" id="sl-jmean-peak-opacity" min="5" max="80" step="5" value="35">
+    </div>
+    <!-- 基座圆透明度滑块 -->
+    <div class="sl-row">
+      <div class="sl-lbl"><span>ATS峰值响应圆透明度</span><span class="sv" id="v-ats-peak-opacity">25%</span></div>
+      <input type="range" id="sl-ats-peak-opacity" min="5" max="80" step="5" value="25">
+    </div>
+    <div class="sl-row">
+      <div class="sl-lbl"><span>ATS最大边际响应圆透明度</span><span class="sv" id="v-marginal-opacity">30%</span></div>
+      <input type="range" id="sl-marginal-opacity" min="5" max="80" step="5" value="30">
+    </div>
+
+    <div class="leg-row" style="margin-top:4px">
+      <div style="width:32px;height:5px;background:linear-gradient(to right,hsl(50,95%,62%),hsl(0,80%,52%));border-radius:3px"></div>
+      <span style="font-size:9.5px;color:#3a5a70">平均突起响应圆着色：Jut排名（金=优秀，红=末位）</span>
+    </div>
+    <div class="leg-row">
+      <div style="width:32px;height:5px;background:linear-gradient(to right,hsl(200,90%,65%),hsl(200,60%,42%));border-radius:3px;border:1px dashed rgba(96,200,255,.4)"></div>
+      <span style="font-size:9.5px;color:#3a5a70">ATS峰值响应圆着色：ATS排名（浅蓝=优秀）</span>
+    </div>
+    <div class="leg-row">
+      <div style="width:32px;height:5px;background:linear-gradient(to right,hsl(35,95%,65%),hsl(28,70%,42%));border-radius:3px;border:1px dashed rgba(255,180,80,.45)"></div>
+      <span style="font-size:9.5px;color:#3a5a70">ATS最大边际响应圆：ATS增速最快半径</span>
+    </div>
+  </div>
+</div>
+
+<!-- ══ 右侧：距离段筛选 ══ -->
+<div class="panel" id="bp-panel" style="top:18px;right:18px;width:242px;max-height:calc(100vh - 120px);display:flex;flex-direction:column">
+  <div class="panel-hd">
+    <div class="bp-hd-row">
+      <div>
+        <h2><i class="fas fa-ruler-horizontal" style="margin-right:5px;color:#60a8ff;font-size:10px"></i>距离段突出筛选</h2>
+        <p>勾选后仅显示该段排名突出的山峰</p>
+      </div>
+      <div class="bp-clear" onclick="clearBands()">全清</div>
+    </div>
+    <!-- 指标选择器 -->
+    <div style="display:flex;gap:4px;margin-top:6px">
+      <div class="metric-btn on" id="mbt-relief" onclick="setBandMetric('relief')">高差</div>
+      <div class="metric-btn"    id="mbt-jut"    onclick="setBandMetric('jut')">Jut</div>
+      <div class="metric-btn"    id="mbt-ats"    onclick="setBandMetric('ats')">ATS</div>
+      <div class="metric-btn"    id="mbt-ors"    onclick="setBandMetric('ors')">ORS</div>
+    </div>
+  </div>
+  <div class="panel-body" style="flex:1;overflow-y:auto">
+
+    <!-- 阈值区（移到顶部，更直观）-->
+    <div class="thr-row" style="margin-top:0;padding-top:0;border-top:none;margin-bottom:8px;padding-bottom:7px;border-bottom:1px solid rgba(90,140,220,.1)">
+      <div class="sl-lbl" style="margin-bottom:3px">
+        <span><i class="fas fa-crosshairs" style="font-size:9px"></i>&nbsp;突出阈值：排名前</span>
+        <span class="sv" id="v-thr">15%</span>
+      </div>
+      <input type="range" id="sl-thr" min="5" max="50" step="5" value="15">
+      <div class="thr-presets">
+        <div class="thr-btn" onclick="setThr(5)">前5%</div>
+        <div class="thr-btn" onclick="setThr(10)">前10%</div>
+        <div class="thr-btn on" id="thr-15" onclick="setThr(15)">前15%</div>
+        <div class="thr-btn" onclick="setThr(20)">前20%</div>
+        <div class="thr-btn" onclick="setThr(30)">前30%</div>
+      </div>
+      <div style="font-size:9px;color:#2a4060;margin-top:4px">
+        前15% ≈ 击败率 &gt;85%（默认）
+      </div>
+    </div>
+
+    <!-- 7 个距离段 -->
+    <div class="band-item" id="bi-125 m - 500 m" onclick="toggleBand('125 m - 500 m',this)">
+      <div class="band-cb-cell"><input class="band-cb" type="checkbox" id="cb-125 m - 500 m" onclick="event.stopPropagation()"></div>
+      <div class="band-info"><div class="band-name">125 m - 500 m</div></div>
+    </div>
+    <div class="band-item" id="bi-625 m - 1250 m" onclick="toggleBand('625 m - 1250 m',this)">
+      <div class="band-cb-cell"><input class="band-cb" type="checkbox" id="cb-625 m - 1250 m" onclick="event.stopPropagation()"></div>
+      <div class="band-info"><div class="band-name">625 m - 1250 m</div></div>
+    </div>
+    <div class="band-item" id="bi-1375 m - 2000 m" onclick="toggleBand('1375 m - 2000 m',this)">
+      <div class="band-cb-cell"><input class="band-cb" type="checkbox" id="cb-1375 m - 2000 m" onclick="event.stopPropagation()"></div>
+      <div class="band-info"><div class="band-name">1375 m - 2000 m</div></div>
+    </div>
+    <div class="band-item" id="bi-2250 m - 3500 m" onclick="toggleBand('2250 m - 3500 m',this)">
+      <div class="band-cb-cell"><input class="band-cb" type="checkbox" id="cb-2250 m - 3500 m" onclick="event.stopPropagation()"></div>
+      <div class="band-info"><div class="band-name">2250 m - 3500 m</div></div>
+    </div>
+    <div class="band-item" id="bi-3750 m - 5000 m" onclick="toggleBand('3750 m - 5000 m',this)">
+      <div class="band-cb-cell"><input class="band-cb" type="checkbox" id="cb-3750 m - 5000 m" onclick="event.stopPropagation()"></div>
+      <div class="band-info"><div class="band-name">3750 m - 5000 m</div></div>
+    </div>
+    <div class="band-item" id="bi-5250 m - 7000 m" onclick="toggleBand('5250 m - 7000 m',this)">
+      <div class="band-cb-cell"><input class="band-cb" type="checkbox" id="cb-5250 m - 7000 m" onclick="event.stopPropagation()"></div>
+      <div class="band-info"><div class="band-name">5250 m - 7000 m</div></div>
+    </div>
+    <div class="band-item" id="bi-7250 m - 10000 m" onclick="toggleBand('7250 m - 10000 m',this)">
+      <div class="band-cb-cell"><input class="band-cb" type="checkbox" id="cb-7250 m - 10000 m" onclick="event.stopPropagation()"></div>
+      <div class="band-info"><div class="band-name">7250 m - 10000 m</div></div>
+    </div>
+    <div class="band-item" id="bi-10000 m - 18000 m" onclick="toggleBand('10000 m - 18000 m',this)">
+      <div class="band-cb-cell"><input class="band-cb" type="checkbox" id="cb-10000 m - 18000 m" onclick="event.stopPropagation()"></div>
+      <div class="band-info"><div class="band-name">10000 m - 18000 m</div></div>
+    </div>
+    <div class="band-item" id="bi-19000 m - 34000 m" onclick="toggleBand('19000 m - 34000 m',this)">
+      <div class="band-cb-cell"><input class="band-cb" type="checkbox" id="cb-19000 m - 34000 m" onclick="event.stopPropagation()"></div>
+      <div class="band-info"><div class="band-name">19000 m - 34000 m</div></div>
+    </div>
+
+    <!-- 多段模式 -->
+    <div class="mode-row" id="mode-row">
+      <div class="mode-btn on" id="mode-any" onclick="setMode('any')">任一段满足</div>
+      <div class="mode-btn"    id="mode-all" onclick="setMode('all')">所有段均满足</div>
+    </div>
+
+    <!-- 统计 -->
+    <div class="bp-stats" id="bp-stats">
+      <div>
+        <div style="font-size:8.5px;color:#2a4060;margin-bottom:1px">命中山峰</div>
+        <div class="cnt" id="hit-cnt">0</div>
+      </div>
+      <div class="bp-stats-r">
+        已选 <span id="band-cnt">0</span> 段<br>
+        <span style="color:#2a4060;font-weight:400">阈值: 排名前 <span id="thr-disp">15</span>%</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ══════════════════════════════════════════════════════════════════
+// 配置
+// ══════════════════════════════════════════════════════════════════
+// ══ 数据集配置 ══════════════════════════════════════════════════════
+// 新增地区精英库时，在下面四个对象中各加一行，并在 HTML 侧栏添加对应
+// <div class="ds-row"> 和图例行即可，其余代码无需改动。
+// ─── 当前已配置 ────────────────────────────────────────────────────
+//   ribus_p1000                      世界Ribus/P1000库
+//   asia_j1000                       亚洲J1000库
+//   europe_j1000                     欧洲J1000库
+//   north_america_j800               北美洲J800库
+//   south_america_j800               南美洲J800库
+//   africa_j250                      非洲J250库
+//   oceania_j250                     大洋洲J250库
+//   antarctica_j250                  南极洲J250库
+//   highasia_e5800_p950              高亚洲E5800&P950库
+//   southeast_asia_gb                东南亚GB库
+//   japan_100peaks                   日本百名山库
+//   japan_j250                       日本J250库
+//   korea_j250                       朝鲜半岛J250库
+//   malaysia_prominence_110peaks     马来西亚P110库
+// ═══════════════════════════════════════════════════════════════════
+const FILES = {
+  ribus_p1000: 'peaks_world/output_ribus_geojson/peaks_ribus.geojson',
+  asia_j1000: 'peaks_world/output_asia_j1000_geojson/peaks_asia_j1000.geojson',
+  europe_j1000: 'peaks_world/output_europe_j1000_geojson/peaks_europe_j1000.geojson',
+  north_america_j800: 'peaks_world/output_north_america_j800_geojson/peaks_north_america_j800.geojson',
+  south_america_j800: 'peaks_world/output_south_america_j800_geojson/peaks_south_america_j800.geojson',
+  africa_j250: 'peaks_world/output_africa_j250_geojson/peaks_africa_j250.geojson',
+  oceania_j250: 'peaks_world/output_oceania_j250_geojson/peaks_oceania_j250.geojson',
+  antarctica_j250: 'peaks_world/output_antarctica_j250_geojson/peaks_antarctica_j250.geojson',
+  highasia_e5800_p950: 'peaks_world/output_highasia_e5800_p950_geojson/peaks_highasia_e5800_p950.geojson',
+  southeast_asia_gb: 'peaks_world/output_southeast_asia_gb_geojson/peaks_southeast_asia_gb.geojson',
+  japan_100peaks: 'peaks_world/output_japan_100peaks_geojson/peaks_japan_100peaks.geojson',
+  japan_j250: 'peaks_world/output_japan_j250_geojson/peaks_japan_j250.geojson',
+  korea_j250: 'peaks_world/output_korea_j250_geojson/peaks_korea_j250.geojson',
+  malaysia_prominence_110peaks: 'peaks_world/output_malaysia_prominence_110peaks_geojson/peaks_malaysia_prominence_110peaks.geojson',
+};
+const DS_LABEL = {
+  ribus_p1000: '世界Ribus/P1000库',
+  asia_j1000: '亚洲J1000库',
+  europe_j1000: '欧洲J1000库',
+  north_america_j800: '北美洲J800库',
+  south_america_j800: '南美洲J800库',
+  africa_j250: '非洲J250库',
+  oceania_j250: '大洋洲J250库',
+  antarctica_j250: '南极洲J250库',
+  highasia_e5800_p950: '高亚洲E5800&P950库',
+  southeast_asia_gb: '东南亚GB库',
+  japan_100peaks: '日本百名山库',
+  japan_j250: '日本J250库',
+  korea_j250: '朝鲜半岛J250库',
+  malaysia_prominence_110peaks: '马来西亚P110库',
+};
+const DS_COLOR = {
+  ribus_p1000: '#40c9a2',
+  asia_j1000: '#40c9a2',
+  europe_j1000: '#40c9a2',
+  north_america_j800: '#40c9a2',
+  south_america_j800: '#40c9a2',
+  africa_j250: '#40c9a2',
+  oceania_j250: '#40c9a2',
+  antarctica_j250: '#40c9a2',
+  highasia_e5800_p950: '#40c9a2',
+  southeast_asia_gb: '#40c9a2',
+  japan_100peaks: '#40c9a2',
+  japan_j250: '#40c9a2',
+  korea_j250: '#40c9a2',
+  malaysia_prominence_110peaks: '#40c9a2',
+};
+const DS_ZORDER = {
+  ribus_p1000: 1,
+  asia_j1000: 2,
+  europe_j1000: 3,
+  north_america_j800: 4,
+  south_america_j800: 5,
+  africa_j250: 6,
+  oceania_j250: 7,
+  antarctica_j250: 8,
+  highasia_e5800_p950: 9,
+  southeast_asia_gb: 10,
+  japan_100peaks: 11,
+  japan_j250: 12,
+  korea_j250: 13,
+  malaysia_prominence_110peaks: 14,
+};
+
+const COL = {
+  ribus_p1000: ['interpolate',['linear'],['coalesce',['get','rp'],0],0,'hsl(220,80%,60%)',0.4,'hsl(165,75%,50%)',0.7,'hsl(55,75%,50%)',1,'hsl(0,75%,50%)'],
+  asia_j1000: ['interpolate',['linear'],['coalesce',['get','rp'],0],0,'hsl(220,80%,60%)',0.4,'hsl(165,75%,50%)',0.7,'hsl(55,75%,50%)',1,'hsl(0,75%,50%)'],
+  europe_j1000: ['interpolate',['linear'],['coalesce',['get','rp'],0],0,'hsl(220,80%,60%)',0.4,'hsl(165,75%,50%)',0.7,'hsl(55,75%,50%)',1,'hsl(0,75%,50%)'],
+  north_america_j800: ['interpolate',['linear'],['coalesce',['get','rp'],0],0,'hsl(220,80%,60%)',0.4,'hsl(165,75%,50%)',0.7,'hsl(55,75%,50%)',1,'hsl(0,75%,50%)'],
+  south_america_j800: ['interpolate',['linear'],['coalesce',['get','rp'],0],0,'hsl(220,80%,60%)',0.4,'hsl(165,75%,50%)',0.7,'hsl(55,75%,50%)',1,'hsl(0,75%,50%)'],
+  africa_j250: ['interpolate',['linear'],['coalesce',['get','rp'],0],0,'hsl(220,80%,60%)',0.4,'hsl(165,75%,50%)',0.7,'hsl(55,75%,50%)',1,'hsl(0,75%,50%)'],
+  oceania_j250: ['interpolate',['linear'],['coalesce',['get','rp'],0],0,'hsl(220,80%,60%)',0.4,'hsl(165,75%,50%)',0.7,'hsl(55,75%,50%)',1,'hsl(0,75%,50%)'],
+  antarctica_j250: ['interpolate',['linear'],['coalesce',['get','rp'],0],0,'hsl(220,80%,60%)',0.4,'hsl(165,75%,50%)',0.7,'hsl(55,75%,50%)',1,'hsl(0,75%,50%)'],
+  highasia_e5800_p950: ['interpolate',['linear'],['coalesce',['get','rp'],0],0,'hsl(220,80%,60%)',0.4,'hsl(165,75%,50%)',0.7,'hsl(55,75%,50%)',1,'hsl(0,75%,50%)'],
+  southeast_asia_gb: ['interpolate',['linear'],['coalesce',['get','rp'],0],0,'hsl(220,80%,60%)',0.4,'hsl(165,75%,50%)',0.7,'hsl(55,75%,50%)',1,'hsl(0,75%,50%)'],
+  japan_100peaks: ['interpolate',['linear'],['coalesce',['get','rp'],0],0,'hsl(220,80%,60%)',0.4,'hsl(165,75%,50%)',0.7,'hsl(55,75%,50%)',1,'hsl(0,75%,50%)'],
+  japan_j250: ['interpolate',['linear'],['coalesce',['get','rp'],0],0,'hsl(220,80%,60%)',0.4,'hsl(165,75%,50%)',0.7,'hsl(55,75%,50%)',1,'hsl(0,75%,50%)'],
+  korea_j250: ['interpolate',['linear'],['coalesce',['get','rp'],0],0,'hsl(220,80%,60%)',0.4,'hsl(165,75%,50%)',0.7,'hsl(55,75%,50%)',1,'hsl(0,75%,50%)'],
+  malaysia_prominence_110peaks: ['interpolate',['linear'],['coalesce',['get','rp'],0],0,'hsl(220,80%,60%)',0.4,'hsl(165,75%,50%)',0.7,'hsl(55,75%,50%)',1,'hsl(0,75%,50%)'],
+};
+const BAND_NAMES = ['125 m - 500 m','625 m - 1250 m','1375 m - 2000 m','2250 m - 3500 m','3750 m - 5000 m','5250 m - 7000 m','7250 m - 10000 m','10000 m - 18000 m','19000 m - 34000 m'];
+
+// 每个库对应的 Jut / 响应半径文件路径配置（提前声明，供预取使用）
+// 新增库时只需在此加一行
+const JUT_SOURCES = {
+  ribus_p1000: { dir: 'peaks_world/output_ribus_geojson', prefix: 'ribus' },
+  asia_j1000: { dir: 'peaks_world/output_asia_j1000_geojson', prefix: 'asia_j1000' },
+  europe_j1000: { dir: 'peaks_world/output_europe_j1000_geojson', prefix: 'europe_j1000' },
+  north_america_j800: { dir: 'peaks_world/output_north_america_j800_geojson', prefix: 'north_america_j800' },
+  south_america_j800: { dir: 'peaks_world/output_south_america_j800_geojson', prefix: 'south_america_j800' },
+  africa_j250: { dir: 'peaks_world/output_africa_j250_geojson', prefix: 'africa_j250' },
+  oceania_j250: { dir: 'peaks_world/output_oceania_j250_geojson', prefix: 'oceania_j250' },
+  antarctica_j250: { dir: 'peaks_world/output_antarctica_j250_geojson', prefix: 'antarctica_j250' },
+  highasia_e5800_p950: { dir: 'peaks_world/output_highasia_e5800_p950_geojson', prefix: 'highasia_e5800_p950' },
+  southeast_asia_gb: { dir: 'peaks_world/output_southeast_asia_gb_geojson', prefix: 'southeast_asia_gb' },
+  japan_100peaks: { dir: 'peaks_world/output_japan_100peaks_geojson', prefix: 'japan_100peaks' },
+  japan_j250: { dir: 'peaks_world/output_japan_j250_geojson', prefix: 'japan_j250' },
+  korea_j250: { dir: 'peaks_world/output_korea_j250_geojson', prefix: 'korea_j250' },
+  malaysia_prominence_110peaks: { dir: 'peaks_world/output_malaysia_prominence_110peaks_geojson', prefix: 'malaysia_prominence_110peaks' },
+};
+
+const WORKER_URL = 'https://mapbox-proxy.18122920.workers.dev';
+
+// 拦截所有发往MapTiler的请求，改走Worker（API Key永不暴露给浏览器）
+const _origFetch = window.fetch.bind(window);
+window.fetch = function(input, init) {
+  let url = (typeof input === 'string') ? input : (input instanceof Request ? input.url : String(input));
+  if (url.startsWith('https://api.maptiler.com')) {
+    const u = new URL(url);
+    u.searchParams.delete('key');
+    const proxyUrl = WORKER_URL + '/proxy/' + u.host + u.pathname + (u.search || '');
+    input = (typeof input === 'string') ? proxyUrl : new Request(proxyUrl, input);
+  }
+  return _origFetch(input, init);
+};
+
+maptilersdk.config.apiKey = 'proxy-mode';
+maptilersdk.config.fetch = window.fetch;
+
+// ── 状态 ──────────────────────────────────────────────────────
+let filterReliefPct = 0, filterJutPct = 0, filterAtsPct = 0, filterOrsPct = 0; // 总体表现筛除（击败率下限，0=不筛）
+let filterMaxJutPct = 0, filterMaxAtsPct = 0; // 峰值筛除（击败率下限，0=不筛）
+let hideWildcard = false; // 隐藏外卡通道山峰（世界库通常无效）
+let hideUnexpanded = false; // 仅显示34km完整山峰
+const ELITE_DS = new Set([]);
+let dotSize = 5, labelsOn = true;
+let nameMode = 'local';
+let activePopup = null, chartInstances = {};
+let activeBands = new Set(), bandMode = 'any', bandThr = 0.15;
+let bandMetric = 'relief';  // 'relief' | 'jut' | 'ats' | 'ors'
+let allData = {};            // ds -> FeatureCollection（仅已加载）
+let searchIndex = [];        // [{name,source,lon,lat,elev,props}]
+let jutProfiles = {};        // ds -> profile json
+let jmeanPeakData = {};            // name -> {max_mean_jut, radius_m, rank, rank_pct}
+let atsPeakCircleData = {};     // name -> {r_ats_peak, max_ats, rank_pct}
+let atsMarginalCircleData = {}; // name -> {r_ats_marginal, ats_marginal_rate_max}
+let jmeanPeakOpacity = 0.35;       // 等效平均突起响应圆透明度
+let atsPeakOpacity = 0.25;      // 等效ATS峰值响应圆透明度
+let marginalOpacity = 0.30;     // ATS最大边际响应圆透明度
+let dsCircleNames = {};      // ds -> Set<name>
+
+const datasetLoadState = {}; // ds -> { loadingPromise }
+const jutLoadState = {};     // ds -> { loadingPromise, loaded, bases, profiles, jmeanPeak, base }
+let loadingHidden = false;
+let mapReadyResolved = false;
+
+function setLoadingState(msg, pct = null){
+  const sub = document.getElementById('ld-msg');
+  if (sub && msg) sub.textContent = msg;
+  if (pct != null) {
+    const bar = document.getElementById('ld-b');
+    if (bar) bar.style.width = `${Math.max(0, Math.min(100, pct))}%`;
+  }
+}
+
+function hideLoading(){
+  if (loadingHidden) return;
+  loadingHidden = true;
+  const bar = document.getElementById('ld-b');
+  if (bar) bar.style.width = '100%';
+  const el = document.getElementById('loading');
+  if (!el) return;
+  setTimeout(() => {
+    el.style.opacity = '0';
+    setTimeout(() => el.remove(), 500);
+  }, 200);
+}
+
+function peakDisplayName(obj){
+  if(!obj) return '';
+  const local = obj.local_name || obj.name || obj.peak_name || '';
+  const english = obj.english_name || local;
+  return nameMode === 'english' ? (english || local) : (local || english);
+}
+
+function peakSearchName(obj){
+  if(!obj) return '';
+  return [
+    obj.search_name || '',
+    obj.name || '',
+    obj.peak_name || '',
+    obj.local_name || '',
+    obj.english_name || ''
+  ].join(' ');
+}
+
+function labelFieldExpr(){
+  return nameMode === 'english'
+    ? ['coalesce',['get','english_name'],['get','local_name'],['get','name']]
+    : ['coalesce',['get','local_name'],['get','name'],['get','english_name']];
+}
+
+function baseLabelFieldExpr(){
+  const n = labelFieldExpr();
+  return ['concat', n, ' Base点'];
+}
+
+function updateNameLanguage(){
+  Object.keys(FILES).forEach(ds=>{
+    if(map && map.getLayer && map.getLayer(`lbl-${ds}`)){
+      map.setLayoutProperty(`lbl-${ds}`, 'text-field', labelFieldExpr());
+    }
+  });
+  if(map && map.getLayer && map.getLayer('lbl-jut-base')){
+    map.setLayoutProperty('lbl-jut-base', 'text-field', baseLabelFieldExpr());
+  }
+  const inp = document.getElementById('search-input');
+  if(inp && inp.value.trim()) doSearch(inp.value.trim());
+}
+
+function checkedDatasets(){
+  return Object.keys(FILES).filter(ds => document.getElementById(`tog-${ds}`)?.checked);
+}
+
+async function fetchJsonSafe(url, fallback){
+  try{
+    const r = await fetch(url);
+    if(!r.ok) throw new Error(String(r.status));
+    return await r.json();
+  }catch(err){
+    console.warn(url, err.message || err);
+    return fallback;
+  }
+}
+
+function addSearchIndexForDataset(ds, data){
+  const feats = Array.isArray(data?.features) ? data.features : [];
+  feats.forEach(f => {
+    const p = f.properties || {};
+    const coords = f.geometry?.coordinates || [];
+    searchIndex.push({
+      name: peakDisplayName(p),
+      local_name: p.local_name || p.name || '',
+      english_name: p.english_name || p.name || '',
+      search_name: peakSearchName(p),
+      source: ds,
+      lon: coords[0],
+      lat: coords[1],
+      elev: p.elev,
+      props: p,
+    });
+  });
+}
+
+function reorderDatasetLayers(){
+  const order = Object.keys(DS_ZORDER).sort((a, b) => DS_ZORDER[a] - DS_ZORDER[b]);
+  [...order].reverse().forEach(ds => {
+    if (map.getLayer(`dot-${ds}`)) map.moveLayer(`dot-${ds}`);
+    if (map.getLayer(`lbl-${ds}`)) map.moveLayer(`lbl-${ds}`);
+  });
+}
+
+function addDatasetToMap(ds){
+  const data = allData[ds] || { type:'FeatureCollection', features:[] };
+  const togOn = document.getElementById(`tog-${ds}`)?.checked;
+
+  if(!map.getSource(`s-${ds}`)){
+    map.addSource(`s-${ds}`, { type: 'geojson', data });
+    map.addLayer({
+      id: `dot-${ds}`, type: 'circle', source: `s-${ds}`,
+      layout: { visibility: togOn ? 'visible' : 'none' },
+      filter: rpFilter() || true,
+      paint: {
+        'circle-radius': dotR(dotSize),
+        'circle-color': COL[ds],
+        'circle-stroke-width': ['interpolate',['linear'],['zoom'],6,.5,11,1.2],
+        'circle-stroke-color': 'rgba(255,255,255,.28)',
+        'circle-opacity': ['interpolate',['linear'],['get','rp'],0,1,1,.72],
+      }
+    });
+    map.addLayer({
+      id: `lbl-${ds}`, type: 'symbol', source: `s-${ds}`,
+      layout: {
+        visibility: (togOn && labelsOn) ? 'visible' : 'none',
+        'text-field': labelFieldExpr(),
+        'text-font': ['Open Sans Bold','Arial Unicode MS Bold'],
+        'text-size': ['interpolate',['linear'],['zoom'],8,9,12,12,14,13],
+        'text-offset': [0,1.1], 'text-anchor': 'top',
+        'text-allow-overlap': false, 'text-optional': true,
+      },
+      filter: rpFilter() || true, minzoom: 8,
+      paint: { 'text-color': DS_COLOR[ds], 'text-halo-color': 'rgba(5,10,22,.9)', 'text-halo-width': 2 }
+    });
+    map.on('mouseenter', `dot-${ds}`, () => map.getCanvas().style.cursor = 'pointer');
+    map.on('mouseleave', `dot-${ds}`, () => map.getCanvas().style.cursor = '');
+    map.on('click', `dot-${ds}`, e => {
+      e.preventDefault();
+      showPopup(e.features[0].properties, e.features[0].geometry.coordinates, ds);
+    });
+  }else{
+    map.getSource(`s-${ds}`).setData(data);
+  }
+
+  reorderDatasetLayers();
+}
+
+async function ensureDatasetLoaded(ds, { withJut = true, silent = false } = {}){
+  if(allData[ds]){
+    if(withJut) await ensureJutDatasetLoaded(ds, { silent: true });
+    return allData[ds];
+  }
+  datasetLoadState[ds] ||= {};
+  if(!datasetLoadState[ds].loadingPromise){
+    if(!silent) setLoadingState(`正在加载 ${DS_LABEL[ds]}…`);
+    datasetLoadState[ds].loadingPromise = fetchJsonSafe(
+      FILES[ds],
+      { type:'FeatureCollection', features:[] }
+    ).then(async data => {
+      allData[ds] = data;
+      const el = document.getElementById(`cnt-${ds}`);
+      if(el) el.textContent = data.features?.length ? `(${data.features.length.toLocaleString()})` : '(0)';
+      addSearchIndexForDataset(ds, data);
+      if(mapReadyResolved) addDatasetToMap(ds);
+      if(withJut) await ensureJutDatasetLoaded(ds, { silent: true });
+      return data;
+    }).finally(() => {
+      datasetLoadState[ds].loadingPromise = null;
+    });
+  }
+  return datasetLoadState[ds].loadingPromise;
+}
+
+function isValidAtsMarginalProps(p){
+  if(!p) return false;
+  const r = p.r_ats_marginal ?? p.radius_m;
+  if(r == null || !Number.isFinite(Number(r))) return false;
+  const meanRaw = p.ats_marginal_ats_mean ?? p.ATS_Marginal_ATS_Mean;
+  if(meanRaw != null && Number.isFinite(Number(meanRaw))) return Number(meanRaw) >= 1;
+  const maxAtsRaw = p.max_ats ?? p.Max_ATS;
+  if(maxAtsRaw != null && Number.isFinite(Number(maxAtsRaw))) return Number(maxAtsRaw) >= 1;
+  return true;
+}
+
+function filterValidAtsMarginalFeatures(fc){
+  return {
+    type: 'FeatureCollection',
+    features: (fc?.features || []).filter(f => isValidAtsMarginalProps(f.properties || {}))
+  };
+}
+
+function spreadOverlappingBases(features, offsetM = 30) {
+  const groups = {};
+  features.forEach((f, i) => {
+    const [lon, lat] = f.geometry.coordinates;
+    const key = lon.toFixed(5) + ',' + lat.toFixed(5);
+    if (!groups[key]) groups[key] = [];
+    groups[key].push(i);
+  });
+  Object.values(groups).forEach(idxs => {
+    if (idxs.length < 2) return;
+    const [bLon, bLat] = features[idxs[0]].geometry.coordinates;
+    const cosLat = Math.cos(bLat * Math.PI / 180);
+    idxs.forEach(idx => {
+      const p = features[idx].properties;
+      const dx = (p.peak_lon - bLon) * 111000 * cosLat;
+      const dy = (p.peak_lat - bLat) * 111000;
+      const angle = Math.atan2(dy, dx);
+      features[idx].geometry.coordinates = [
+        bLon + offsetM * Math.cos(angle) / (111000 * cosLat),
+        bLat + offsetM * Math.sin(angle) / 111000,
+      ];
+    });
+  });
+}
+
+function rebuildLoadedJutLayers(){
+  const allBases = { type:'FeatureCollection', features:[] };
+  const allJmeanPeak   = { type:'FeatureCollection', features:[] };
+  const allBase  = { type:'FeatureCollection', features:[] };
+  const allMarginal = { type:'FeatureCollection', features:[] };
+  const profiles = {};
+
+  jmeanPeakData = {};
+  atsPeakCircleData = {};
+  atsMarginalCircleData = {};
+  dsCircleNames = {};
+
+  Object.entries(jutLoadState).forEach(([ds, st]) => {
+    if(!st?.loaded) return;
+    profiles[ds] = st.profiles || {};
+    allBases.features.push(...(st.bases?.features || []));
+    allJmeanPeak.features.push(...(st.jmeanPeak?.features || []));
+    allBase.features.push(...(st.base?.features || []));
+    allMarginal.features.push(...filterValidAtsMarginalFeatures(st.atsMarginal).features);
+  });
+
+  jutProfiles = profiles;
+  allJmeanPeak.features.forEach(f => {
+    jmeanPeakData[f.properties.name] = f.properties;
+    const ds = f.properties._ds;
+    if(!dsCircleNames[ds]) dsCircleNames[ds] = new Set();
+    dsCircleNames[ds].add(f.properties.name);
+  });
+  allBase.features.forEach(f => {
+    atsPeakCircleData[f.properties.name] = f.properties;
+  });
+  allMarginal.features.forEach(f => {
+    atsMarginalCircleData[f.properties.name] = f.properties;
+  });
+  allBases.features.forEach(f => {
+    const ds = f.properties._ds;
+    if(!dsCircleNames[ds]) dsCircleNames[ds] = new Set();
+    dsCircleNames[ds].add(f.properties.peak_name);
+  });
+
+  spreadOverlappingBases(allBases.features, 30);
+
+  if(map.getSource('s-jut-base')){
+    map.getSource('s-jut-base').setData(allBases);
+  }else{
+    map.addSource('s-jut-base', {type:'geojson', data: allBases});
+    map.addLayer({
+      id:'dot-jut-base', type:'circle', source:'s-jut-base',
+      layout:{visibility: document.getElementById('tog-jut-base').checked?'visible':'none'},
+      paint:{
+        'circle-radius':['interpolate',['linear'],['zoom'],5,3,9,5,14,7],
+        'circle-color':'#40ffa0',
+        'circle-stroke-width':['interpolate',['linear'],['zoom'],6,.8,11,1.4],
+        'circle-stroke-color':'rgba(0,50,30,.8)',
+        'circle-opacity':.82,
+      }
+    });
+    map.addLayer({
+      id:'lbl-jut-base', type:'symbol', source:'s-jut-base',
+      layout:{
+        visibility:(document.getElementById('tog-jut-base').checked&&labelsOn)?'visible':'none',
+        'text-field': baseLabelFieldExpr(),
+        'text-font':['Open Sans Regular','Arial Unicode MS Regular'],
+        'text-size':['interpolate',['linear'],['zoom'],9,8,13,10],
+        'text-offset':[0,1.1],'text-anchor':'top',
+        'text-allow-overlap':false,'text-optional':true,
+      },
+      minzoom:9,
+      paint:{'text-color':'#30d888','text-halo-color':'rgba(0,15,10,.9)','text-halo-width':1.5},
+    });
+    map.on('mouseenter','dot-jut-base',()=>map.getCanvas().style.cursor='pointer');
+    map.on('mouseleave','dot-jut-base',()=>map.getCanvas().style.cursor='');
+    map.on('click','dot-jut-base',e=>{
+      e.preventDefault();
+      e.stopPropagation();
+      showJutBasePopup(e.features[0].properties, e.features[0].geometry.coordinates);
+    });
+  }
+
+  buildJmeanPeakLayer(allJmeanPeak);
+  buildAtsPeakCircleLayer(allBase);
+  buildAtsMarginalCircleLayer(allMarginal);
+  updateCircleDsFilter();
+}
+
+async function ensureJutDatasetLoaded(ds, { silent = false } = {}){
+  if(!JUT_SOURCES[ds]) return;
+  jutLoadState[ds] ||= { loaded: false, loadingPromise: null };
+  if(jutLoadState[ds].loaded) return;
+  if(!jutLoadState[ds].loadingPromise){
+    const { dir, prefix } = JUT_SOURCES[ds];
+    if(!silent) setLoadingState(`正在加载 Jut · ${DS_LABEL[ds]}…`);
+    jutLoadState[ds].loadingPromise = Promise.all([
+      fetchJsonSafe(`${dir}/${prefix}_jut_bases.geojson`, {type:'FeatureCollection',features:[]}),
+      fetchJsonSafe(`${dir}/${prefix}_jut_profiles.json`, {}),
+      fetchJsonSafe(`${dir}/${prefix}_jmean_peak_circles.geojson`, {type:'FeatureCollection',features:[]}),
+      fetchJsonSafe(`${dir}/${prefix}_ats_peak_circles.geojson`, {type:'FeatureCollection',features:[]}),
+      fetchJsonSafe(`${dir}/${prefix}_ats_marginal_circles.geojson`, {type:'FeatureCollection',features:[]}),
+    ]).then(([bases, profiles, jmeanPeak, base, atsMarginal]) => {
+      const tag = feats => (feats || []).map(f => ({ ...f, properties: { ...(f.properties || {}), _ds: ds } }));
+      jutLoadState[ds] = {
+        loaded: true,
+        loadingPromise: null,
+        bases: { type:'FeatureCollection', features: tag(bases.features) },
+        profiles: profiles || {},
+        jmeanPeak: { type:'FeatureCollection', features: tag(jmeanPeak.features) },
+        base:  { type:'FeatureCollection', features: tag(base.features) },
+        atsMarginal: { type:'FeatureCollection', features: tag(filterValidAtsMarginalFeatures(atsMarginal).features) },
+      };
+      if(mapReadyResolved) rebuildLoadedJutLayers();
+    }).finally(() => {
+      if(jutLoadState[ds]) jutLoadState[ds].loadingPromise = null;
+    });
+  }
+  return jutLoadState[ds].loadingPromise;
+}
+
+async function loadJutData(dsList = null){
+  const targets = (dsList && dsList.length ? dsList : checkedDatasets()).filter(ds => JUT_SOURCES[ds]);
+  await Promise.all(targets.map(ds => ensureJutDatasetLoaded(ds, { silent: true })));
+  if(mapReadyResolved) rebuildLoadedJutLayers();
+}
+
+// ══════════════════════════════════════════════════════════════════
+// 地图初始化（仅加载默认勾选库；其他库按需懒加载）
+// ══════════════════════════════════════════════════════════════════
+const map = new maptilersdk.Map({
+  container: 'map',
+  style: WORKER_URL + '/proxy/api.maptiler.com/maps/outdoor-v2/style.json',
+  center: [86, 32], zoom: 3.4, pitch: 45, bearing: 0,
+  transformRequest: (url) => {
+    if (url.startsWith('https://api.maptiler.com')) {
+      const u = new URL(url);
+      u.searchParams.delete('key');
+      return { url: WORKER_URL + '/proxy/' + u.host + u.pathname + (u.search || '') };
+    }
+    return { url };
+  },
+});
+map.addControl(new maptilersdk.NavigationControl(), 'bottom-right');
+map.addControl(new maptilersdk.ScaleControl({unit: 'metric'}), 'bottom-left');
+
+
+function makeOverallFilter(){
+  const rMin = filterReliefPct, jMin = filterJutPct, aMin = filterAtsPct, oMin = filterOrsPct;
+  const mjxMin = filterMaxJutPct, maxMin = filterMaxAtsPct;
+  if(rMin===0 && jMin===0 && aMin===0 && oMin===0 && mjxMin===0 && maxMin===0) return null;
+  const conds = [];
+  if(rMin>0)   conds.push(['<=',['get','mean_relief_crp'], 1-rMin]);
+  if(jMin>0)   conds.push(['<=',['get','mean_jut_crp'],    1-jMin]);
+  if(aMin>0)   conds.push(['<=',['get','mean_ats_crp'],    1-aMin]);
+  if(oMin>0)   conds.push(['<=',['get','ors_34km_crp'],    1-oMin]);
+  if(mjxMin>0) conds.push(['<=',['get','max_jut_crp'],     1-mjxMin]);
+  if(maxMin>0) conds.push(['<=',['get','max_ats_crp'],     1-maxMin]);
+  if(conds.length===1) return conds[0];
+  return ['all',...conds];
+}
+
+function rpFilter(){ return makeOverallFilter(); }
+function dotR(sz){return['interpolate',['linear'],['zoom'],5,sz*.45,9,sz,14,sz*1.7]}
+
+const mapReady = new Promise(resolve => map.on('load', () => {
+  mapReadyResolved = true;
+  resolve();
+}));
+
+mapReady.then(() => {
+  map.addSource('dem', {
+    type: 'raster-dem',
+    tiles: [`${WORKER_URL}/proxy/api.maptiler.com/tiles/terrain-rgb-v2/{z}/{x}/{y}.webp`],
+    tileSize: 256, maxzoom: 14, attribution: '© MapTiler'
+  });
+  map.setTerrain({ source: 'dem', exaggeration: 1.4 });
+});
+
+async function initLazyData(){
+  try{
+    setLoadingState('初始化地图…', 10);
+    await mapReady;
+    setupControls();
+    setupSearch();
+
+    const defaults = checkedDatasets();
+    if(defaults.length){
+      setLoadingState(`正在加载默认库（${defaults.length} 个）…`, 30);
+      for(let i = 0; i < defaults.length; i++){
+        const ds = defaults[i];
+        await ensureDatasetLoaded(ds, { withJut: false, silent: true });
+        setLoadingState(`已加载 ${DS_LABEL[ds]}`, 30 + Math.round(((i + 1) / defaults.length) * 45));
+      }
+      await loadJutData(defaults);
+    }
+
+    setLoadingState('初始化完成', 100);
+    hideLoading();
+  }catch(err){
+    console.error(err);
+    setLoadingState('初始化完成（部分数据未加载）', 100);
+    hideLoading();
+  }
+}
+
+initLazyData();
+// ══════════════════════════════════════════════════════════════════
+// 检索功能
+// ══════════════════════════════════════════════════════════════════
+let searchTimer = null, focusIdx = -1, lastResults = [];
+
+function setupSearch(){
+  const inp = document.getElementById('search-input');
+  const dd  = document.getElementById('search-dropdown');
+  const clr = document.getElementById('search-clear');
+
+  inp.addEventListener('input', ()=>{
+    clr.classList.toggle('vis', inp.value.length>0);
+    clearTimeout(searchTimer);
+    searchTimer = setTimeout(()=>doSearch(inp.value.trim()), 120);
+  });
+
+  inp.addEventListener('keydown', e=>{
+    if(!dd.classList.contains('vis')) return;
+    if(e.key==='ArrowDown'){   e.preventDefault(); moveFocus(1); }
+    else if(e.key==='ArrowUp'){e.preventDefault(); moveFocus(-1);}
+    else if(e.key==='Enter'){  e.preventDefault(); if(focusIdx>=0&&lastResults[focusIdx]) selectResult(lastResults[focusIdx]); }
+    else if(e.key==='Escape'){ closeDrop(); inp.blur(); }
+  });
+
+  document.addEventListener('click', e=>{
+    if(!e.target.closest('#search-input')&&!e.target.closest('#search-dropdown')) closeDrop();
+  });
+}
+
+function doSearch(q){
+  const dd = document.getElementById('search-dropdown');
+  if(!q){ closeDrop(); return; }
+
+  const ql = q.toLowerCase().replace(/\s/g,'');
+  // 匹配：name 包含关键字（忽略空格、大小写）
+  const hits = searchIndex.filter(item=>{
+    const n = (item.search_name||item.name).toLowerCase().replace(/\s/g,'');
+    return n.includes(ql);
+  }).slice(0, 30);
+
+  lastResults = hits; focusIdx = -1;
+  if(!hits.length){
+    dd.innerHTML = '<div class="sd-none">无匹配结果</div>';
+    dd.classList.add('vis'); return;
+  }
+
+  dd.innerHTML = hits.map((item,i)=>{
+    const sCol = DS_COLOR[item.source]||'#60a8ff';
+    const sLbl = DS_LABEL[item.source]||item.source;
+    // 高亮匹配字符
+    const dispName = peakDisplayName(item);
+    const hl = highlightMatch(dispName, ql);
+    return `<div class="sd-item" data-idx="${i}" onmousedown="event.preventDefault()" onclick="selectResult(lastResults[${i}])">
+      <span class="sd-name">${hl}</span>
+      <span class="sd-src" style="background:${sCol}22;color:${sCol};border:1px solid ${sCol}44">${sLbl}</span>
+      <span class="sd-elev">${item.elev!=null?item.elev+'m':''}</span>
+    </div>`;
+  }).join('');
+  dd.classList.add('vis');
+}
+
+function highlightMatch(name, ql){
+  // 简单高亮：在去空格版本中找匹配位置，标红原字符串中对应区域
+  const escaped = name.replace(/[<>&]/g,c=>({'<':'&lt;','>':'&gt;','&':'&amp;'}[c]));
+  const lo = escaped.toLowerCase().replace(/\s/g,'');
+  const idx = lo.indexOf(ql);
+  if(idx<0) return escaped;
+  // 映射回原字符串（含空格）
+  let si=0, out='', mapped=[];
+  for(let i=0;i<escaped.length;i++){
+    if(escaped[i]!==' '){mapped.push(si);si++;}else{mapped.push(-1);}
+  }
+  let inHL=false;
+  for(let i=0;i<escaped.length;i++){
+    const mi=mapped[i];
+    if(mi===idx&&!inHL){out+='<span style="color:#60d890;font-weight:700">';inHL=true;}
+    out+=escaped[i];
+    if(inHL&&mi>=0&&mi===idx+ql.length-1){out+='</span>';inHL=false;}
+  }
+  return out;
+}
+
+function selectResult(item){
+  closeDrop();
+  document.getElementById('search-input').value = peakDisplayName(item);
+  document.getElementById('search-clear').classList.add('vis');
+  // 飞到该点
+  map.flyTo({center:[item.lon,item.lat],zoom:Math.max(map.getZoom(),13),duration:900,essential:true});
+  // 打开弹窗
+  setTimeout(()=>showPopup(item.props,[item.lon,item.lat],item.source), 500);
+}
+
+function moveFocus(dir){
+  const items = document.querySelectorAll('.sd-item');
+  if(!items.length) return;
+  items[focusIdx]?.classList.remove('focused');
+  focusIdx = Math.max(0, Math.min(items.length-1, focusIdx+dir));
+  items[focusIdx].classList.add('focused');
+  items[focusIdx].scrollIntoView({block:'nearest'});
+}
+
+function closeDrop(){
+  document.getElementById('search-dropdown').classList.remove('vis');
+  focusIdx=-1;
+}
+
+function clearSearch(){
+  document.getElementById('search-input').value='';
+  document.getElementById('search-clear').classList.remove('vis');
+  closeDrop();
+}
+
+// ══════════════════════════════════════════════════════════════════
+// Jut 数据加载 & 图层
+// ══════════════════════════════════════════════════════════════════
+
+function buildAtsPeakCircleLayer(baseGeo){
+  const sorted = {type:'FeatureCollection',
+    features:[...(baseGeo?.features || [])].sort((a,b)=>b.properties.radius_m-a.properties.radius_m)};
+
+  if(map.getSource('s-ats-peak-circle')){
+    map.getSource('s-ats-peak-circle').setData(sorted);
+  }else{
+    map.addSource('s-ats-peak-circle',{type:'geojson', data:sorted});
+
+  }
+
+  const togOn = document.getElementById('tog-ats-peak-circle').checked;
+  const op = atsPeakOpacity;
+
+  const firstDotLayerB = Object.keys(FILES).map(ds=>`dot-${ds}`).find(id=>map.getLayer(id));
+  if(!map.getLayer('fill-ats-peak-circle')) map.addLayer({
+    id:'fill-ats-peak-circle', type:'fill', source:'s-ats-peak-circle',
+    layout:{visibility:togOn?'visible':'none'},
+    paint:{
+      'fill-color':['interpolate',['linear'],['get','rank_pct'],
+        0,'hsl(200,90%,65%)',
+        0.25,'hsl(200,80%,55%)',
+        0.5,'hsl(200,65%,46%)',
+        1,'hsl(200,50%,36%)'
+      ],
+      'fill-opacity':['*', op*0.7, ['interpolate',['linear'],['get','rank_pct'],0,.8,1,.3]],
+    }
+  }, firstDotLayerB);
+
+  if(!map.getLayer('stroke-ats-peak-circle')) map.addLayer({
+    id:'stroke-ats-peak-circle', type:'line', source:'s-ats-peak-circle',
+    layout:{visibility:togOn?'visible':'none'},
+    paint:{
+      'line-color':'hsl(200,80%,62%)',
+      'line-width':['interpolate',['linear'],['zoom'],5,.5,10,.9,13,1.4],
+      'line-dasharray':[4,3],
+      'line-opacity':['interpolate',['linear'],['get','rank_pct'],0,.8,.5,.5,1,.3],
+    }
+  }, firstDotLayerB);
+
+  if(!buildAtsPeakCircleLayer._eventsBound){
+    map.on('mouseenter','fill-ats-peak-circle',()=>map.getCanvas().style.cursor='pointer');
+    map.on('mouseleave','fill-ats-peak-circle',()=>map.getCanvas().style.cursor='');
+    map.on('click','fill-ats-peak-circle',e=>{
+    e.preventDefault();
+    const p=e.features[0].properties;
+      showAtsPeakCirclePopup(p,[p.center_lon,p.center_lat]);
+    });
+    buildAtsPeakCircleLayer._eventsBound = true;
+  }
+}
+
+
+function buildAtsMarginalCircleLayer(marginalGeo){
+  const sorted = {type:'FeatureCollection',
+    features:[...(marginalGeo?.features || [])].sort((a,b)=>b.properties.radius_m-a.properties.radius_m)};
+
+  if(map.getSource('s-ats-marginal-circle')){
+    map.getSource('s-ats-marginal-circle').setData(sorted);
+  }else{
+    map.addSource('s-ats-marginal-circle',{type:'geojson', data:sorted});
+  }
+
+  const togOn = document.getElementById('tog-ats-marginal-circle')?.checked;
+  const firstDotLayerM = Object.keys(FILES).map(ds=>`dot-${ds}`).find(id=>map.getLayer(id));
+  if(!map.getLayer('fill-ats-marginal-circle')) map.addLayer({
+    id:'fill-ats-marginal-circle', type:'fill', source:'s-ats-marginal-circle',
+    layout:{visibility:togOn?'visible':'none'},
+    paint:{
+      'fill-color':['interpolate',['linear'],['coalesce',['get','rank_pct'],0.5],
+        0,'hsl(42,95%,66%)',
+        0.5,'hsl(34,82%,52%)',
+        1,'hsl(24,70%,38%)'
+      ],
+      'fill-opacity':['*', marginalOpacity*0.65, ['interpolate',['linear'],['coalesce',['get','rank_pct'],0.5],0,.8,1,.3]],
+    }
+  }, firstDotLayerM);
+
+  if(!map.getLayer('stroke-ats-marginal-circle')) map.addLayer({
+    id:'stroke-ats-marginal-circle', type:'line', source:'s-ats-marginal-circle',
+    layout:{visibility:togOn?'visible':'none'},
+    paint:{
+      'line-color':'hsl(35,95%,65%)',
+      'line-width':['interpolate',['linear'],['zoom'],5,.6,10,1.0,13,1.5],
+      'line-dasharray':[2,2],
+      'line-opacity':['interpolate',['linear'],['coalesce',['get','rank_pct'],0.5],0,.85,.5,.6,1,.35],
+    }
+  }, firstDotLayerM);
+
+  if(!buildAtsMarginalCircleLayer._eventsBound){
+    map.on('mouseenter','fill-ats-marginal-circle',()=>map.getCanvas().style.cursor='pointer');
+    map.on('mouseleave','fill-ats-marginal-circle',()=>map.getCanvas().style.cursor='');
+    map.on('click','fill-ats-marginal-circle',e=>{
+      e.preventDefault();
+      const p=e.features[0].properties;
+      showAtsMarginalCirclePopup(p,[p.center_lon,p.center_lat]);
+    });
+    buildAtsMarginalCircleLayer._eventsBound = true;
+  }
+}
+
+function showAtsMarginalCirclePopup(p, coords){
+  if(activePopup) activePopup.remove();
+  const rate = p.ats_marginal_rate_max!=null ? parseFloat(p.ats_marginal_rate_max).toFixed(4) : '—';
+  const start = p.ats_marginal_interval_start!=null ? Number(p.ats_marginal_interval_start).toLocaleString()+' m' : '—';
+  const end = p.ats_marginal_interval_end!=null ? Number(p.ats_marginal_interval_end).toLocaleString()+' m' : '—';
+  const html=`
+<div class="pp-wrap">
+<div class="jut-hd" style="background:linear-gradient(135deg,rgba(45,25,0,.97),rgba(25,12,0,.97))">
+  <span style="color:#ffb347">🟠 ${peakDisplayName(p)}</span>
+  <span class="jut-badge" style="color:#ffb347;background:rgba(255,170,60,.1);border-color:rgba(255,170,60,.3)">ATS最大边际响应半径</span>
+</div>
+<div class="jut-body">
+  <div class="jut-row" style="color:#7a5020"><span>海拔</span><span style="color:#ffb347;font-weight:700;font-family:monospace">${p.peak_elev} m</span></div>
+  <div class="jut-row" style="color:#7a5020"><span>R_ATS_marginal</span><span style="color:#ffb347;font-weight:700;font-family:monospace;font-size:14px">${Number(p.radius_m).toLocaleString()} m</span></div>
+  <div class="jut-row" style="color:#7a5020"><span>ATS最大增速</span><span style="color:#ffb347;font-weight:700;font-family:monospace">${rate}</span></div>
+  <div class="jut-row" style="color:#7a5020"><span>最大增速区间</span><span style="color:#ffb347;font-weight:700;font-family:monospace">${start} → ${end}</span></div>
+  <div class="jut-row" style="color:#7a5020"><span>ATS峰值响应半径</span><span style="color:#90b8d0;font-weight:700;font-family:monospace">${p.r_ats_peak!=null?parseFloat(p.r_ats_peak).toLocaleString()+' m':'—'}</span></div>
+</div>`;
+  activePopup=new maptilersdk.Popup({maxWidth:'380px',closeButton:true,closeOnClick:false,className:'dark-popup'})
+    .setLngLat(coords).setHTML(html).addTo(map);
+}
+
+function showAtsPeakCirclePopup(p, coords){
+  if(activePopup) activePopup.remove();
+  const hasRank = p.rank_pct != null && p.max_ats > 0;
+  const pct = hasRank ? Math.round((1-p.rank_pct)*100) : null;
+  const col = hasRank ? `hsl(${200},${70+Math.round((1-p.rank_pct)*20)}%,${40+Math.round((1-p.rank_pct)*20)}%)` : '#4a6a80';
+  const atsRankHtml = hasRank
+    ? `<span style="color:${col};font-weight:700;font-family:monospace">击败 ${pct}%</span>`
+    : `<span style="color:#2a4060;font-style:italic">指标≤0，不参与排名</span>`;
+  const html=`
+<div class="pp-wrap">
+<div class="jut-hd" style="background:linear-gradient(135deg,rgba(0,25,40,.97),rgba(0,12,25,.97))">
+  <span style="color:#60c8ff">🔵 ${peakDisplayName(p)}</span>
+  <span class="jut-badge" style="color:#60c8ff;background:rgba(0,150,255,.1);border-color:rgba(0,150,255,.3)">ATS峰值响应半径</span>
+</div>
+<div class="jut-body">
+  <div class="jut-row" style="color:#2a5a7a"><span>海拔</span><span style="color:#60c8ff;font-weight:700;font-family:monospace">${p.peak_elev} m</span></div>
+  <div class="jut-row" style="color:#2a5a7a"><span>最大ATS</span><span style="color:#60c8ff;font-weight:700;font-family:monospace">${p.max_ats!=null?parseFloat(p.max_ats).toFixed(2):'—'}</span></div>
+  <div class="jut-row" style="color:#2a5a7a"><span>ATS峰值响应半径</span><span style="color:${col};font-weight:700;font-family:monospace;font-size:14px">${p.radius_m.toLocaleString()} m</span></div>
+  <div class="jut-row" style="color:#2a5a7a"><span>平均突起响应半径</span><span style="color:#90b8d0;font-weight:700;font-family:monospace">${p.r_jmean_peak!=null?parseFloat(p.r_jmean_peak).toLocaleString()+' m':'—'}</span></div>
+  <div class="jut-row" style="border-top:1px solid rgba(0,150,255,.15);padding-top:5px;margin-top:3px;color:#2a5a7a">
+    <span>ATS排名</span>
+    ${atsRankHtml}
+  </div>
+</div>`;
+  activePopup=new maptilersdk.Popup({maxWidth:'360px',closeButton:true,closeOnClick:false,className:'dark-popup'})
+    .setLngLat(coords).setHTML(html).addTo(map);
+}
+
+function buildJmeanPeakLayer(jmeanPeakGeo){
+  // 按 radius_m 降序排列：半径大的先渲染，小的在上层（视觉上不被遮挡）
+  const sorted = {type:'FeatureCollection',
+    features:[...(jmeanPeakGeo?.features || [])].sort((a,b)=>b.properties.radius_m-a.properties.radius_m)};
+
+  if(map.getSource('s-jmean-peak')){
+    map.getSource('s-jmean-peak').setData(sorted);
+  }else{
+    map.addSource('s-jmean-peak',{type:'geojson',data:sorted});
+  }
+
+  const togOn = document.getElementById('tog-jmean-peak').checked;
+  const op = jmeanPeakOpacity; // 使用全局透明度变量
+
+  // Fill layer - 插入到所有山峰点层之前（圆在底部不遮挡点）
+  const firstDotLayer = Object.keys(FILES).map(ds=>`dot-${ds}`).find(id=>map.getLayer(id));
+  if(!map.getLayer('fill-jmean-peak')) map.addLayer({
+    id:'fill-jmean-peak', type:'fill', source:'s-jmean-peak',
+    layout:{visibility:togOn?'visible':'none'},
+    paint:{
+      'fill-color':['interpolate',['linear'],['get','rank_pct'],
+        0,'hsl(50,95%,62%)',
+        0.25,'hsl(35,90%,58%)',
+        0.5,'hsl(18,85%,52%)',
+        1,'hsl(0,78%,48%)'
+      ],
+      // 透明度 = jmeanPeakOpacity × (1 - rank_pct*0.6)，优秀的圆更不透明
+      'fill-opacity':['*', op, ['interpolate',['linear'],['get','rank_pct'],0,1,1,.4]],
+    }
+  }, firstDotLayer);
+
+  // Stroke layer
+  if(!map.getLayer('stroke-jmean-peak')) map.addLayer({
+    id:'stroke-jmean-peak', type:'line', source:'s-jmean-peak',
+    layout:{visibility:togOn?'visible':'none'},
+    paint:{
+      'line-color':['interpolate',['linear'],['get','rank_pct'],
+        0,'hsl(50,90%,68%)',
+        0.5,'hsl(20,85%,60%)',
+        1,'hsl(0,75%,55%)'
+      ],
+      'line-width':['interpolate',['linear'],['zoom'],5,.6,10,1.2,13,1.8],
+      'line-opacity':['interpolate',['linear'],['get','rank_pct'],0,.9,.5,.6,1,.4],
+    }
+  }, firstDotLayer);
+
+  if(!buildJmeanPeakLayer._eventsBound){
+    map.on('mouseenter','fill-jmean-peak',()=>map.getCanvas().style.cursor='pointer');
+    map.on('mouseleave','fill-jmean-peak',()=>map.getCanvas().style.cursor='');
+    map.on('click','fill-jmean-peak',e=>{
+    e.preventDefault();
+    const p=e.features[0].properties;
+      showJmeanPeakPopup(p,[p.center_lon,p.center_lat]);
+    });
+    buildJmeanPeakLayer._eventsBound = true;
+  }
+}
+
+function showJutBasePopup(p, coords){
+  Object.values(chartInstances).forEach(c=>{try{c.destroy();}catch{}});
+  chartInstances={};
+  const uid='jb'+Date.now();
+  const profile = (jutProfiles[p._ds]||{})[p.peak_name];
+
+  const html=`
+<div class="pp-wrap">
+<div class="jut-hd">
+  <span>👁 ${peakDisplayName(p)} — 最优Jut观测点</span>
+  <span class="jut-badge">Jut Base</span>
+</div>
+<div class="jut-body">
+  <div class="jut-row"><span>观测峰（山顶）</span><span class="jut-val">${peakDisplayName(p)} ${p.peak_elev}m</span></div>
+  <div class="jut-row"><span>Base点海拔</span><span class="jut-val">${p.base_elev} m</span></div>
+  <div class="jut-row"><span>到峰距离</span><span class="jut-val">${p.distance_m.toLocaleString()} m</span></div>
+  <div class="jut-row"><span>高差</span><span class="jut-val">${p.vertical_relief_m} m</span></div>
+  <div class="jut-row"><span>仰角</span><span class="jut-val">${p.elev_angle_deg}°</span></div>
+  <div class="jut-row" style="border-top:1px solid rgba(0,255,150,.15);padding-top:5px;margin-top:3px">
+    <span>最大Jut（高差·sin仰角）</span>
+    <span class="jut-val" style="color:#ffd700;font-size:14px">${p.max_jut}</span>
+  </div>
+  <div class="jut-row"><span>对应搜索半径</span><span class="jut-val">${p.search_radius_m}m</span></div>
+</div>
+${profile?`
+<div style="padding:3px 12px 2px;font-size:9px;color:#2a6a4a;letter-spacing:.5px;border-top:1px solid rgba(0,255,150,.1)">▸ 平均/最大 Jut · 随搜索半径变化</div>
+<div class="jut-chart-wrap">
+  <div class="chart-leg">
+    <div class="cl-i"><div class="cl-ln" style="background:#40ffa0"></div><span style="color:#3a7a5a">平均Jut</span></div>
+    <div class="cl-i"><div class="cl-ln" style="background:#ffd700;opacity:.8;border-top:2px dashed #ffd700;height:0"></div><span style="color:#7a7040">最大Jut</span></div>
+  </div>
+  <canvas id="${uid}-jc" class="jc"></canvas>
+  <div class="chart-note">X：搜索半径 (m)&nbsp;|&nbsp;Y：Jut = 高差 × sin(仰角)</div>
+</div>
+</div>
+`:''}
+</div>`;
+
+  if(activePopup) activePopup.remove();
+  activePopup=new maptilersdk.Popup({maxWidth:'420px',closeButton:true,closeOnClick:false,className:'dark-popup'})
+    .setLngLat(coords).setHTML(html).addTo(map);
+
+  // Draw line from base to peak
+  const lineId='jut-line-'+Date.now();
+  if(map.getSource('jut-line-src')) map.removeLayer('jut-line-lyr'), map.removeSource('jut-line-src');
+  map.addSource('jut-line-src',{type:'geojson',data:{type:'Feature',geometry:{type:'LineString',
+    coordinates:[coords,[p.peak_lon,p.peak_lat]]}}});
+  map.addLayer({id:'jut-line-lyr',type:'line',source:'jut-line-src',
+    paint:{'line-color':'#40ffa0','line-width':1.5,'line-dasharray':[4,3],'line-opacity':.7}});
+  activePopup.on('close',()=>{
+    if(map.getLayer('jut-line-lyr')) map.removeLayer('jut-line-lyr');
+    if(map.getSource('jut-line-src')) map.removeSource('jut-line-src');
+  });
+
+  if(profile){
+    setTimeout(()=>{
+      const canvas=document.getElementById(uid+'-jc');
+      if(!canvas) return;
+      const labels=profile.radii.map(r=>r>=1000?(r/1000).toFixed(r%1000===0?0:1)+'k':String(r));
+      const dg={color:'rgba(0,80,50,.12)'};
+      const tk={font:{size:9},color:'#2a6a4a'};
+      chartInstances[uid]= new Chart(canvas,{type:'line',
+        data:{labels,datasets:[
+          {label:'平均Jut',data:profile.mean_juts,borderColor:'#40ffa0',backgroundColor:'rgba(64,255,160,.1)',
+           borderWidth:2.2,tension:.35,fill:true,pointRadius:2,pointBackgroundColor:'#40ffa0',order:1},
+          {label:'最大Jut',data:profile.max_juts,borderColor:'#ffd700',backgroundColor:'transparent',
+           borderWidth:1.4,borderDash:[5,4],tension:.35,fill:false,pointRadius:0,order:2},
+        ]},
+        options:{responsive:true,maintainAspectRatio:false,animation:{duration:220},
+          plugins:{legend:{display:false},
+            tooltip:{mode:'index',intersect:false,backgroundColor:'rgba(0,20,12,.92)',titleColor:'#40ffa0',bodyColor:'#3a7a5a',
+              callbacks:{title:i=>`半径 ${Number(profile.radii[i[0].dataIndex]).toLocaleString()} m`,
+                         label:i=>`${i.dataset.label}: ${i.raw}`}}},
+          scales:{x:{...tk,grid:dg,ticks:{...tk,maxRotation:40}},
+                  y:{...tk,grid:dg,title:{display:true,text:'Jut',font:{size:9},color:'#2a6a4a'}}}}
+      });
+    },80);
+  }
+}
+
+function showPopup(p,coords,ds){
+  Object.values(chartInstances).forEach(c=>{try{c.destroy();}catch{}});
+  chartInstances={};
+  const rp=p.rp!=null ? parseFloat(p.rp) : 0.5;
+  const hue=rpHue(rp);
+  const cM=`hsl(${hue},72%,58%)`,cX=`hsl(${hue},44%,72%)`;
+  const uid='pp'+Date.now();
+  const sCol=DS_COLOR[ds]||'#60a8ff',sLbl=DS_LABEL[ds]||ds;
+  const radii=JSON.parse(p.chart_r||'[]'),maxRel=JSON.parse(p.chart_mx||'[]'),
+        meanRl=JSON.parse(p.chart_mn||'[]'),meanRk=JSON.parse(p.chart_rk||'[]');
+  const hasC=radii.length>0,hasRk=meanRk.length>0;
+
+  // 三步筛选摘要（仅区域精英库有此字段）
+  let filterSummaryHtml='';
+  if(p.filter_summary){
+    let fs={};try{fs=JSON.parse(p.filter_summary);}catch{}
+    const channel = p.channel || 'main';
+    const isWildcard = channel === 'wildcard';
+    const s1 = fs['第一步达标档位数'] ?? '—';
+    const s2 = fs['第二步验证通过数'] ?? '—';
+    const c95 = fs['极其优秀(s2)'] ?? 0;
+    const c90 = fs['相当优秀(s2)'] ?? 0;
+    const c85 = fs['优秀(s2)'] ?? 0;
+    const wc99 = fs['外卡-超级优秀(c99)'] ?? 0;
+    const wc95 = fs['外卡-极其优秀(c95)'] ?? 0;
+    const wc90 = fs['外卡-相当优秀(c90)'] ?? 0;
+    const mkBadge = (n, lbl, col) => n > 0
+      ? `<span style="font-size:9px;padding:1px 6px;border-radius:10px;background:${col}22;color:${col};border:1px solid ${col}55;margin-right:3px">${lbl}×${n}</span>` : '';
+
+    if(isWildcard){
+      // 外卡通道
+      filterSummaryHtml=`
+<div style="padding:3px 14px 5px;background:rgba(255,160,0,.05);border-top:1px solid rgba(255,160,0,.15)">
+  <div style="display:flex;align-items:center;gap:5px;margin-bottom:3px">
+    <span style="font-size:8.5px;color:#b06000;letter-spacing:.4px">▸ 三步筛选摘要</span>
+    <span style="font-size:8px;padding:1px 7px;border-radius:10px;background:rgba(255,160,0,.15);color:#ffa030;border:1px solid rgba(255,160,0,.35)">⚡ 外卡通道 (Step-3)</span>
+  </div>
+  <div style="display:flex;align-items:center;gap:6px;font-size:10px;color:#7a5020;margin-bottom:3px">
+    <span>Step-1达标: <b style="color:#ffa030">${s1}</b> 档</span>
+    <span style="color:#3a2010">→</span>
+    <span style="color:#5a3a10">Step-2: <b style="color:#805030">${s2}</b> 档（未达线）</span>
+    <span style="color:#3a2010">→</span>
+    <span>外卡通过</span>
+  </div>
+  <div style="font-size:8.5px;color:#6a4010;margin-bottom:2px">外卡档位（本库内部排名）：</div>
+  <div>
+    ${mkBadge(wc99,'超级优秀(前1%)','#ff6600')}${mkBadge(wc95,'极其优秀(前5%)','#ffa030')}${mkBadge(wc90,'相当优秀(前10%)','#ffc060')}
+  </div>
+</div>`;
+    } else {
+      // 正常通道（Step-2）
+      filterSummaryHtml=`
+<div style="padding:3px 14px 5px;background:rgba(80,160,80,.04);border-top:1px solid rgba(90,140,220,.08)">
+  <div style="font-size:8.5px;color:#2a6040;margin-bottom:3px;letter-spacing:.4px">▸ 三步筛选摘要（库内排名 → 绝对高差验证）</div>
+  <div style="display:flex;align-items:center;gap:8px;font-size:10px;color:#3a7050">
+    <span>Step-1达标: <b style="color:#60d090">${s1}</b> 档</span>
+    <span style="color:#1a4030">→</span>
+    <span>Step-2通过: <b style="color:#60d090">${s2}</b> 档</span>
+  </div>
+  <div style="margin-top:3px">
+    ${mkBadge(c95,'极其优秀','#ffd700')}${mkBadge(c90,'相当优秀','#60d090')}${mkBadge(c85,'优秀','#40a0ff')}
+  </div>
+</div>`;
+    }
+  }
+
+  // 查询该山峰的 Jut 和响应半径数据
+  const peakName=p.name||'';
+  const peakTitle=peakDisplayName(p);
+  const jProf=(jutProfiles[ds]||{})[peakName];
+  const jmeanPeakP=jmeanPeakData[peakName];
+  const atsPeakP=atsPeakCircleData[peakName];
+  const amP=atsMarginalCircleData[peakName];
+  const hasJut=jProf&&jProf.radii&&jProf.radii.length>0;
+
+  // ── 基础指标扩展 ──────────────────────────────────────────
+  // 综合排名前%
+  const mrCrp  = p.mean_relief_crp!=null ? Math.round((1-parseFloat(p.mean_relief_crp))*100) : null;
+  const mjCrp  = p.mean_jut_crp!=null    ? Math.round((1-parseFloat(p.mean_jut_crp))*100)    : null;
+  const maCrp  = p.mean_ats_crp!=null    ? Math.round((1-parseFloat(p.mean_ats_crp))*100)    : null;
+  const mjxCrp = p.max_jut_crp!=null     ? Math.round((1-parseFloat(p.max_jut_crp))*100)     : null;
+  const maxCrp = p.max_ats_crp!=null     ? Math.round((1-parseFloat(p.max_ats_crp))*100)     : null;
+  // 峰值指标
+  const maxJut     = p.max_jut     != null ? parseFloat(p.max_jut).toFixed(2)     : '—';
+  const maxMeanJut = p.max_mean_jut!= null ? parseFloat(p.max_mean_jut).toFixed(2): (jmeanPeakP?jmeanPeakP.max_mean_jut.toFixed(2):'—');
+  const maxMeanJutR= p.max_mean_jut_peak_radius != null ? parseInt(p.max_mean_jut_peak_radius).toLocaleString()+' m' : (jmeanPeakP?jmeanPeakP.radius_m.toLocaleString()+' m':'—');
+  const mmjRp  = (p.max_mean_jut_peak_rp!= null && p.max_mean_jut > 0)
+    ? Math.round((1-parseFloat(p.max_mean_jut_peak_rp))*100) : null;
+  const maxFsi     = p.max_fsi != null ? parseFloat(p.max_fsi).toFixed(4) : '—';
+  const maxFsiR    = p.max_fsi_r!= null ? parseInt(p.max_fsi_r).toLocaleString()+' m' : '—';
+  const maxAts     = p.max_ats != null ? parseFloat(p.max_ats).toFixed(2) : (jmeanPeakP?jmeanPeakP.max_ats:'—');
+  const maxAtsR    = p.max_ats_peak_radius!= null ? parseInt(p.max_ats_peak_radius).toLocaleString()+' m' : (atsPeakP?atsPeakP.radius_m.toLocaleString()+' m':'—');
+  const maxAtsRp   = (p.max_ats_peak_rp!= null && p.max_ats > 0)
+    ? Math.round((1-parseFloat(p.max_ats_peak_rp))*100) : null;
+  const rProm  = p.r_jmean_peak!=null ? parseInt(p.r_jmean_peak).toLocaleString()+' m' : (jmeanPeakP?jmeanPeakP.radius_m.toLocaleString()+' m':'—');
+  const rBase  = p.r_ats_peak!=null ? parseInt(p.r_ats_peak).toLocaleString()+' m' : (atsPeakP?atsPeakP.radius_m.toLocaleString()+' m':'—');
+  const ownAmValid = isValidAtsMarginalProps(p);
+  const rAtsMarginal = ownAmValid ? Number(p.r_ats_marginal).toLocaleString()+' m' : (isValidAtsMarginalProps(amP) ? Number(amP.radius_m ?? amP.r_ats_marginal).toLocaleString()+' m' : '—');
+  // 折线峰值置信度（0~1，越高说明等效半径越明确）
+  const atsConf = p.ats_conf != null ? parseFloat(p.ats_conf) : null;
+  const jutConf = p.jut_conf != null ? parseFloat(p.jut_conf) : null;
+  function confBadge(conf, label) {
+    if(conf===null) return '';
+    const pct = Math.round(conf*100);
+    const hue = Math.round(conf*120);  // 0=红,60=黄,120=绿
+    const tag = conf>=0.5?'高':conf>=0.25?'中':'低';
+    return `<span style="font-size:9px;color:hsl(${hue},70%,55%);font-weight:700" `
+         + `title="折线峰值置信度：${pct}%（越高说明${label}越明确）">`
+         + `置信${tag}(${pct}%)</span>`;
+  }
+
+  function crpBadge(pct, col){
+    if(pct===null) return '<span style="color:#2a4060">—</span>';
+    if(pct===0) return '<span style="color:#2a4060;font-style:italic;font-size:9px">指标≤0</span>';
+    const hue=Math.round(pct*2.2);
+    return `<span style="color:hsl(${hue},72%,58%);font-weight:700;font-family:monospace">${pct}%</span>`;
+  }
+
+  const extendedInfoHtml=`
+<div style="padding:4px 14px 6px;background:rgba(20,30,60,.3);border-top:1px solid rgba(90,140,220,.1)">
+  <div style="font-size:8.5px;color:#2a4060;margin-bottom:5px;letter-spacing:.5px">▸ 综合排名击败率（跨半径均值）</div>
+  <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:3px;margin-bottom:3px">
+    <div style="text-align:center;background:rgba(90,140,220,.06);padding:4px 2px;border-radius:5px">
+      <div style="font-size:8px;color:#2a4060">高差均值</div>
+      ${crpBadge(mrCrp,'#80c0ff')}
+    </div>
+    <div style="text-align:center;background:rgba(0,200,100,.06);padding:4px 2px;border-radius:5px">
+      <div style="font-size:8px;color:#2a6a4a">Jut均值</div>
+      ${crpBadge(mjCrp,'#40ffa0')}
+    </div>
+    <div style="text-align:center;background:rgba(0,150,255,.06);padding:4px 2px;border-radius:5px">
+      <div style="font-size:8px;color:#2a5a7a">ATS均值</div>
+      ${crpBadge(maCrp,'#60c8ff')}
+    </div>
+  </div>
+  <div style="font-size:8.5px;color:#2a4060;margin-bottom:3px;letter-spacing:.5px">▸ 峰值排名击败率</div>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:3px;margin-bottom:5px">
+    <div style="text-align:center;background:rgba(0,200,100,.08);padding:4px 2px;border-radius:5px">
+      <div style="font-size:8px;color:#2a6a4a">最大Jut峰值</div>
+      ${crpBadge(mjxCrp,'#40ffa0')}
+    </div>
+    <div style="text-align:center;background:rgba(0,150,255,.08);padding:4px 2px;border-radius:5px">
+      <div style="font-size:8px;color:#2a5a7a">最大ATS峰值</div>
+      ${crpBadge(maxCrp,'#60c8ff')}
+    </div>
+  </div>
+  <div style="font-size:8.5px;color:#2a4060;margin-bottom:4px;margin-top:3px;letter-spacing:.5px">▸ 峰值指标</div>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:3px 10px">
+    <div class="pp-row" style="margin:0"><span style="color:#3a7a5a;font-size:10px">最大Jut</span><span style="color:#40ffa0;font-weight:700;font-family:monospace;font-size:11px">${maxJut}</span></div>
+    <div class="pp-row" style="margin:0"><span style="color:#3a7a5a;font-size:10px">最大均Jut</span><span style="color:#40ffa0;font-weight:700;font-family:monospace;font-size:11px">${maxMeanJut}</span></div>
+    <div class="pp-row" style="margin:0"><span style="color:#6a5a30;font-size:10px">↑ 对应半径</span><span style="color:#ffd700;font-family:monospace;font-size:10px">${maxMeanJutR}</span></div>
+    <div class="pp-row" style="margin:0"><span style="color:#3a7a5a;font-size:10px">↑ 全库击败</span><span style="color:#40ffa0;font-family:monospace;font-size:10px">${mmjRp!==null?mmjRp+'%':'—'}</span></div>
+    <div class="pp-row" style="margin:0"><span style="color:#6a5a7a;font-size:10px">最大FSI</span><span style="color:#c0a0ff;font-weight:700;font-family:monospace;font-size:11px">${maxFsi}</span></div>
+    <div class="pp-row" style="margin:0"><span style="color:#6a5a7a;font-size:10px">↑ 对应半径</span><span style="color:#c0a0ff;font-family:monospace;font-size:10px">${maxFsiR}</span></div>
+    <div class="pp-row" style="margin:0"><span style="color:#2a5a7a;font-size:10px">最大ATS</span><span style="color:#60c8ff;font-weight:700;font-family:monospace;font-size:11px">${maxAts}</span></div>
+    <div class="pp-row" style="margin:0"><span style="color:#2a5a7a;font-size:10px">↑ 对应半径</span><span style="color:#60c8ff;font-family:monospace;font-size:10px">${maxAtsR}</span></div>
+    <div class="pp-row" style="margin:0"><span style="color:#2a5a7a;font-size:10px">ATS 全库击败</span><span style="color:#60c8ff;font-family:monospace;font-size:10px">${maxAtsRp!==null?maxAtsRp+'%':'—'}</span></div>
+    <div class="pp-row" style="margin:0"></div>
+    <div class="pp-row" style="margin:0;border-top:1px solid rgba(90,140,220,.08);padding-top:3px"><span style="color:#6a5a30;font-size:10px">平均突起响应半径</span><span style="color:#ffd700;font-weight:700;font-family:monospace;font-size:11px">${rProm}</span><span style="margin-left:6px">${confBadge(jutConf,"平均突起响应半径")}</span></div>
+    <div class="pp-row" style="margin:0;padding-top:2px"><span style="color:#2a5a7a;font-size:10px">ATS峰值响应半径</span><span style="color:#60c8ff;font-weight:700;font-family:monospace;font-size:11px">${rBase}</span><span style="margin-left:6px">${confBadge(atsConf,"ATS峰值响应半径")}</span></div>
+    <div class="pp-row" style="margin:0;padding-top:2px"><span style="color:#8a5a20;font-size:10px">ATS最大边际响应半径</span><span style="color:#ffb347;font-weight:700;font-family:monospace;font-size:11px">${rAtsMarginal}</span></div>
+  </div>
+</div>`;
+
+  // Jut 摘要（保留但精简，因为详情已在扩展区）
+  let jutSummaryHtml='';
+  if(hasJut||jmeanPeakP){
+    const jmeanPeakRank=jmeanPeakP?`#${jmeanPeakP.rank}`:'—';
+    jutSummaryHtml=''; // 详细信息已在 extendedInfoHtml 中显示
+  }
+
+  const html=`
+<div class="pp-wrap">
+<div class="pp-hd">
+  <span>${peakTitle||'无名峰'}</span>
+  <span class="pp-src" style="background:${sCol}22;color:${sCol};border:1px solid ${sCol}44">${sLbl}</span>
+</div>
+<div class="pp-body">
+  <div class="pp-row"><span>海拔</span><span class="pp-val">${p.elev!=null?p.elev+' m':'—'}</span></div>
+  <div class="pp-row"><span>库内综合击败率</span><span class="pp-val" style="color:hsl(${hue},72%,62%)">${((1-rp)*100).toFixed(1)} %</span></div>
+  ${p.defeat_ratio!=null?`<div class="pp-row"><span>综合击败率</span><span class="pp-val" style="color:#50d090">${parseFloat(p.defeat_ratio).toFixed(1)} %</span></div>`:''}
+  ${p.region?`<div class="pp-row"><span>所属地区</span><span class="pp-val" style="color:#80a0c0">${p.region}</span></div>`:''}
+</div>
+${filterSummaryHtml}
+${extendedInfoHtml}
+<hr class="pp-sep">
+<div style="display:flex;border-bottom:1px solid rgba(90,140,220,.1);padding:0 12px;gap:1px">
+  <div onclick="switchBandTab('relief','${uid}')" id="btb-relief-${uid}" style="flex:1;padding:4px 0;text-align:center;font-size:10px;color:#80c0ff;border-bottom:2px solid #60a8ff;margin-bottom:-1px;cursor:pointer;font-weight:700">高差段</div>
+  <div onclick="switchBandTab('jut','${uid}')"    id="btb-jut-${uid}"    style="flex:1;padding:4px 0;text-align:center;font-size:10px;color:#2a5a90;border-bottom:2px solid transparent;margin-bottom:-1px;cursor:pointer">Jut段</div>
+  <div onclick="switchBandTab('ats','${uid}')"    id="btb-ats-${uid}"    style="flex:1;padding:4px 0;text-align:center;font-size:10px;color:#2a5a90;border-bottom:2px solid transparent;margin-bottom:-1px;cursor:pointer">ATS段</div>
+</div>
+<div id="bb-relief-${uid}">${bandBarsHtml(p.band_rp,'#80c0ff')}</div>
+<div id="bb-jut-${uid}"    style="display:none">${bandBarsHtml(p.band_jut_rp,'#40ffa0')}</div>
+<div id="bb-ats-${uid}"    style="display:none">${bandBarsHtml(p.band_ats_rp,'#60c8ff')}</div>
+${hasC?`
+<hr class="pp-sep" style="margin:3px 0">
+<div class="chart-tabs">
+  <div class="chart-tab active" data-tab="${uid}-r"  onclick="switchTab(this,'${uid}')">📈 高差</div>
+  ${hasRk?`<div class="chart-tab" data-tab="${uid}-k"  onclick="switchTab(this,'${uid}')">📊 高差排名</div>`:''}
+  ${hasJut?`<div class="chart-tab" data-tab="${uid}-j"  onclick="switchTab(this,'${uid}')">🌿 Jut</div>`:''}
+  ${hasJut?`<div class="chart-tab" data-tab="${uid}-jk" onclick="switchTab(this,'${uid}')">📊 Jut排名</div>`:''}
+  <div class="chart-tab" data-tab="${uid}-a"  onclick="switchTab(this,'${uid}')">⚡ ATS</div>
+  <div class="chart-tab" data-tab="${uid}-ak" onclick="switchTab(this,'${uid}')">📊 ATS排名</div>
+</div>
+<div id="${uid}-r" class="chart-panel active">
+  <div class="chart-leg">
+    <div class="cl-i"><div class="cl-ln" style="background:${cM}"></div><span>平均高差</span></div>
+    <div class="cl-i"><div class="cl-ln" style="background:${cX};opacity:.8;border-top:2px dashed ${cX};height:0"></div><span>最大高差</span></div>
+  </div>
+  <canvas id="${uid}-cr" class="cc"></canvas>
+  <div class="chart-note">X：搜索半径 (m)&nbsp;|&nbsp;Y：高差 (m)</div>
+</div>
+${hasRk?`<div id="${uid}-k" class="chart-panel">
+  <canvas id="${uid}-ck" class="cc"></canvas>
+  <div class="chart-note">X：搜索半径&nbsp;|&nbsp;Y：高差排名（Y轴反转）</div>
+</div>`:''}
+${hasJut?`<div id="${uid}-j" class="chart-panel">
+  <div class="chart-leg">
+    <div class="cl-i"><div class="cl-ln" style="background:#40ffa0"></div><span style="color:#3a7a5a">平均Jut</span></div>
+    <div class="cl-i"><div class="cl-ln" style="background:#ffd700;opacity:.8;border-top:2px dashed #ffd700;height:0"></div><span style="color:#7a7040">最大Jut</span></div>
+  </div>
+  <canvas id="${uid}-jc" class="cc"></canvas>
+  <div class="chart-note">X：搜索半径 (m)&nbsp;|&nbsp;Y：Jut = 高差 × sin(仰角)</div>
+</div>`:''}
+${hasJut?`<div id="${uid}-jk" class="chart-panel">
+  <canvas id="${uid}-jkc" class="cc"></canvas>
+  <div class="chart-note">X：搜索半径&nbsp;|&nbsp;Y：Jut排名（Y轴反转）</div>
+</div>`:''}
+<div id="${uid}-a" class="chart-panel">
+  <div class="chart-leg">
+    <div class="cl-i"><div class="cl-ln" style="background:#60c8ff"></div><span style="color:#2a5a7a">ATS（绝对地形锐度）</span></div>
+  </div>
+  <canvas id="${uid}-ac" class="cc"></canvas>
+  <div class="chart-note">X：搜索半径 (m)&nbsp;|&nbsp;Y：ATS (m)</div>
+</div>
+<div id="${uid}-ak" class="chart-panel">
+  <canvas id="${uid}-akc" class="cc"></canvas>
+  <div class="chart-note">X：搜索半径&nbsp;|&nbsp;Y：ATS排名（Y轴反转）</div>
+</div>
+`:`<div style="padding:10px 14px;font-size:11px;color:#2a4060;text-align:center">暂无图谱数据</div>`}
+</div>`;
+
+  if(activePopup) activePopup.remove();
+  activePopup=new maptilersdk.Popup({maxWidth:'500px',closeButton:true,closeOnClick:false,className:'dark-popup'})
+    .setLngLat(coords).setHTML(html).addTo(map);
+  if(hasC) setTimeout(()=>{
+    const atsVals=JSON.parse(p.chart_ats||'[]');
+    const atsRkVals=JSON.parse(p.chart_ats_rk||'[]');
+    const jutRkVals=hasJut&&jProf.jut_ranks?jProf.jut_ranks:[];
+    buildCharts(uid,radii,maxRel,meanRl,meanRk,cM,cX);
+    buildAtsChart(uid,radii,atsVals,atsRkVals);
+    if(hasJut){
+      buildJutChart(uid,jProf);
+      buildJutRankChart(uid,radii,jutRkVals);
+    }
+  },80);
+}
+
+function showJmeanPeakPopup(p, coords){
+  if(activePopup) activePopup.remove();
+  const hasRank = p.rank_pct != null && p.max_mean_jut > 0;
+  const pct = hasRank ? Math.round((1-p.rank_pct)*100) : null;
+  const hue = hasRank ? Math.round(p.rank_pct*50) : 0;
+  const col = hasRank ? `hsl(${50-Math.round(p.rank_pct*50)},90%,58%)` : '#4a6a80';
+  const rankHtml = hasRank
+    ? `<span style="color:${col};font-weight:700;font-family:monospace">#${p.rank} &nbsp;击败 ${pct}%</span>`
+    : `<span style="color:#2a4060;font-style:italic">指标≤0，不参与排名</span>`;
+  const html=`
+<div class="pp-wrap">
+<div class="jut-hd" style="background:linear-gradient(135deg,rgba(30,25,0,.97),rgba(15,12,0,.97))">
+  <span style="color:#ffd070">🔵 ${peakDisplayName(p)}</span>
+  <span class="jut-badge" style="color:#ffd070;background:rgba(255,200,0,.1);border-color:rgba(255,200,0,.3)">平均突起响应半径</span>
+</div>
+<div class="jut-body">
+  <div class="jut-row" style="color:#6a5a30"><span>海拔</span><span style="color:#ffd070;font-weight:700;font-family:monospace">${p.peak_elev} m</span></div>
+  <div class="jut-row" style="color:#6a5a30"><span>最大平均Jut</span><span style="color:#ffd070;font-weight:700;font-family:monospace">${p.max_mean_jut.toFixed(2)}</span></div>
+  <div class="jut-row" style="color:#6a5a30"><span>平均突起响应半径</span><span style="color:${col};font-weight:700;font-family:monospace;font-size:14px">${p.radius_m.toLocaleString()} m</span></div>
+  <div class="jut-row" style="border-top:1px solid rgba(255,200,0,.15);padding-top:5px;margin-top:3px;color:#6a5a30">
+    <span>Jut排名</span>
+    ${rankHtml}
+  </div>
+</div>`;
+  activePopup=new maptilersdk.Popup({maxWidth:'360px',closeButton:true,closeOnClick:false,className:'dark-popup'})
+    .setLngLat(coords).setHTML(html).addTo(map);
+}
+
+// ══════════════════════════════════════════════════════════════════
+// 左侧控件
+// ══════════════════════════════════════════════════════════════════
+function setVis(ds,on){
+  if(map.getLayer(`dot-${ds}`)) map.setLayoutProperty(`dot-${ds}`,'visibility',on?'visible':'none');
+  if(map.getLayer(`lbl-${ds}`)) map.setLayoutProperty(`lbl-${ds}`,'visibility',(on&&labelsOn)?'visible':'none');
+  updateCircleDsFilter();
+}
+
+// 根据各数据集开关状态，直接用_ds字段过滤圆图层，彻底避免跨库同名峰误匹配
+function updateCircleDsFilter(){
+  const allDsKeys = Object.keys(JUT_SOURCES||{});
+  const activeDsList = allDsKeys.filter(ds=>{
+    const tog = document.getElementById(`tog-${ds}`);
+    return tog && tog.checked;
+  });
+  const allDsOn = (activeDsList.length === allDsKeys.length);
+
+  // 直接按_ds字段过滤（jmean_peak/ats_peak_circle/jut_base的feature均有_ds标签）
+  const dsFilter = allDsOn ? null
+    : (activeDsList.length === 0
+        ? ['==', ['get','_ds'], '__NONE__']
+        : (activeDsList.length === 1
+            ? ['==', ['get','_ds'], activeDsList[0]]
+            : ['in', ['get','_ds'], ['literal', activeDsList]]));
+
+  currentDsCircleFilter = dsFilter;
+  applyAllCircleFilters();
+}
+
+// 全局ds圆过滤器（由updateCircleDsFilter维护）
+let currentDsCircleFilter = null;
+
+// 将 ds过滤、总体表现筛除、Jut击败率筛除 合并应用到圆图层
+function applyAllCircleFilters(){
+  // 1. ds维度：当前开启的库的圆
+  const dsF = currentDsCircleFilter;
+
+  // 2. 总体表现+Jut击败率维度：可见山峰名
+  const crpJutNames = getCrpJutVisibleNames();
+  const noOvFilter = (filterReliefPct===0 && filterJutPct===0 && filterAtsPct===0 && filterOrsPct===0 && filterMaxJutPct===0 && filterMaxAtsPct===0 && !hideWildcard && !hideUnexpanded);
+  const crpF = noOvFilter ? null : ['in',['get','name'],['literal',[...crpJutNames]]];
+
+  // 3. Jut击败率对平均突起响应圆的rank_pct直接过滤
+  const rankF = null;  // Jut全库击败率筛除已移除
+
+  function buildFilter(extraRankFilter){
+    const parts = [dsF, crpF, extraRankFilter].filter(Boolean);
+    if(parts.length===0) return null;
+    if(parts.length===1) return parts[0];
+    return ['all',...parts];
+  }
+
+  const jmeanPeakF = buildFilter(rankF);
+  const baseF = buildFilter(null);
+
+  ['fill-jmean-peak','stroke-jmean-peak'].forEach(id=>{
+    if(map.getLayer(id)) map.setFilter(id, jmeanPeakF);
+  });
+  ['fill-ats-peak-circle','stroke-ats-peak-circle'].forEach(id=>{
+    if(map.getLayer(id)) map.setFilter(id, baseF);
+  });
+  ['fill-ats-marginal-circle','stroke-ats-marginal-circle'].forEach(id=>{
+    if(map.getLayer(id)) map.setFilter(id, baseF);
+  });
+
+  // Base点：_ds直接过滤 + peak_name白名单（双重保障）
+  if(map.getLayer('dot-jut-base')){
+    // _ds过滤（与jmean_peak/ats_peak_circle一致，避免同名峰跨库误显示）
+    const bpDsF = dsF;  // 与圆图层使用相同的_ds过滤器
+    // peak_name白名单过滤（总体表现筛选）
+    const bpNamesF = noOvFilter ? null
+      : ['in',['get','peak_name'],['literal',[...crpJutNames]]];
+    // 合并
+    const bpParts = [bpDsF, bpNamesF].filter(Boolean);
+    const bpF = bpParts.length === 0 ? null
+      : bpParts.length === 1 ? bpParts[0]
+      : ['all', ...bpParts];
+    map.setFilter('dot-jut-base', bpF);
+    map.setFilter('lbl-jut-base', bpF);
+  }
+}
+
+// 计算总体表现+Jut击败率筛除后的可见山峰名集合
+function getCrpJutVisibleNames(){
+  const visibleNames = new Set();
+  Object.keys(allData).forEach(ds=>{
+    allData[ds].features.forEach(f=>{
+      const p = f.properties;
+      const rMin = filterReliefPct, jMin = filterJutPct, aMin = filterAtsPct, oMin = filterOrsPct;
+      const mjxMin = filterMaxJutPct, maxMin = filterMaxAtsPct;
+      let passOverall = true;
+      if(rMin>0 || jMin>0 || aMin>0 || oMin>0 || mjxMin>0 || maxMin>0){
+        const rCrp   = p.mean_relief_crp!=null ? parseFloat(p.mean_relief_crp) : 1;
+        const jCrp   = p.mean_jut_crp   !=null ? parseFloat(p.mean_jut_crp)   : 1;
+        const aCrp   = p.mean_ats_crp   !=null ? parseFloat(p.mean_ats_crp)   : 1;
+        const oCrp   = p.ors_34km_crp   !=null ? parseFloat(p.ors_34km_crp)   : 1;
+        const mjxCrp = p.max_jut_crp    !=null ? parseFloat(p.max_jut_crp)    : 1;
+        const maxCrp = p.max_ats_crp    !=null ? parseFloat(p.max_ats_crp)    : 1;
+        passOverall = (rMin>0 && rCrp<=(1-rMin)) || (jMin>0 && jCrp<=(1-jMin)) || (aMin>0 && aCrp<=(1-aMin))
+                   || (oMin>0 && oCrp<=(1-oMin))
+                   || (mjxMin>0 && mjxCrp<=(1-mjxMin)) || (maxMin>0 && maxCrp<=(1-maxMin));
+      }
+      const passJut = true;  // Jut全库击败率筛除已移除
+      if(passOverall && passJut){
+        if(hideWildcard && ELITE_DS.has(ds) && p.channel === 'wildcard') return;
+        if(hideUnexpanded && !p.is_expanded) return;
+        visibleNames.add(p.name);
+      }
+    });
+  });
+  return visibleNames;
+}
+function setupControls(){
+  if(setupControls._bound) return;
+  setupControls._bound = true;
+
+  Object.keys(FILES).forEach(ds=>document.getElementById(`tog-${ds}`).addEventListener('change', async e => {
+    const on = e.target.checked;
+    if(on){
+      await ensureDatasetLoaded(ds, { withJut: true });
+      if(document.getElementById('tog-jut-base').checked || document.getElementById('tog-jmean-peak').checked || document.getElementById('tog-ats-peak-circle').checked || document.getElementById('tog-ats-marginal-circle').checked){
+        await ensureJutDatasetLoaded(ds, { silent: true });
+        rebuildLoadedJutLayers();
+      }
+    }
+    setVis(ds, on);
+  }));
+
+  document.getElementById('tog-jut-base').addEventListener('change', async e=>{
+    const on=e.target.checked;
+    if(on){
+      await loadJutData();
+    }
+    if(map.getLayer('dot-jut-base')) map.setLayoutProperty('dot-jut-base','visibility',on?'visible':'none');
+    if(map.getLayer('lbl-jut-base')) map.setLayoutProperty('lbl-jut-base','visibility',(on&&labelsOn)?'visible':'none');
+  });
+  document.getElementById('tog-jmean-peak').addEventListener('change', async e=>{
+    const on = e.target.checked;
+    if(on){
+      await loadJutData();
+    }
+    const v=on?'visible':'none';
+    if(map.getLayer('fill-jmean-peak')) map.setLayoutProperty('fill-jmean-peak','visibility',v);
+    if(map.getLayer('stroke-jmean-peak')) map.setLayoutProperty('stroke-jmean-peak','visibility',v);
+  });
+  document.getElementById('tog-ats-peak-circle').addEventListener('change', async e=>{
+    const on = e.target.checked;
+    if(on){
+      await loadJutData();
+    }
+    const v=on?'visible':'none';
+    if(map.getLayer('fill-ats-peak-circle'))   map.setLayoutProperty('fill-ats-peak-circle','visibility',v);
+    if(map.getLayer('stroke-ats-peak-circle')) map.setLayoutProperty('stroke-ats-peak-circle','visibility',v);
+  });
+  document.getElementById('tog-ats-marginal-circle').addEventListener('change', async e=>{
+    const on = e.target.checked;
+    if(on){
+      await loadJutData();
+    }
+    const v=on?'visible':'none';
+    if(map.getLayer('fill-ats-marginal-circle'))   map.setLayoutProperty('fill-ats-marginal-circle','visibility',v);
+    if(map.getLayer('stroke-ats-marginal-circle')) map.setLayoutProperty('stroke-ats-marginal-circle','visibility',v);
+  });
+  document.getElementById('tog-labels').addEventListener('change',e=>{
+    labelsOn=e.target.checked;
+    Object.keys(FILES).forEach(ds=>{
+      const on=document.getElementById(`tog-${ds}`).checked;
+      if(map.getLayer(`lbl-${ds}`)) map.setLayoutProperty(`lbl-${ds}`,'visibility',(labelsOn&&on)?'visible':'none');
+    });
+    // jut labels
+    const jutOn=document.getElementById('tog-jut-base').checked;
+    if(map.getLayer('lbl-jut-base')) map.setLayoutProperty('lbl-jut-base','visibility',(labelsOn&&jutOn)?'visible':'none');
+  });
+  document.getElementById('tog-english-names').addEventListener('change',e=>{
+    nameMode = e.target.checked ? 'english' : 'local';
+    updateNameLanguage();
+  });
+  // ── 总体表现筛除（高差/Jut/ATS）──────────────────────────────
+  function pctLabel(v){ return v===0?'不筛除':v+'%'; }
+  function applyCrpFilter(){
+    const f = makeOverallFilter(); // 指标表达式过滤（null=不筛）
+
+    Object.keys(FILES).forEach(ds=>{
+      // 外卡过滤：只对精英库生效，用Mapbox表达式直接过滤channel字段
+      let wcF = null;
+      if(hideWildcard && ELITE_DS.has(ds)){
+        wcF = ['!=', ['coalesce',['get','channel'],'normal'], 'wildcard'];
+      }
+      let expF = null;
+      if(hideUnexpanded){
+        expF = ['==', ['coalesce',['get','is_expanded'], false], true];
+      }
+
+      const parts = [wcF, expF, f].filter(Boolean);
+      const fApply = parts.length===0 ? true : (parts.length===1 ? parts[0] : ['all', ...parts]);
+
+      if(map.getLayer(`dot-${ds}`)) map.setFilter(`dot-${ds}`, fApply);
+      if(map.getLayer(`lbl-${ds}`)) map.setFilter(`lbl-${ds}`, fApply);
+    });
+    syncCircleFilterWithPeaks();
+  }
+  document.getElementById('sl-filter-relief').addEventListener('input',e=>{
+    filterReliefPct = parseInt(e.target.value)/100;
+    document.getElementById('v-filter-relief').textContent = pctLabel(parseInt(e.target.value));
+    applyCrpFilter();
+  });
+  document.getElementById('sl-filter-jut').addEventListener('input',e=>{
+    filterJutPct = parseInt(e.target.value)/100;
+    document.getElementById('v-filter-jut').textContent = pctLabel(parseInt(e.target.value));
+    applyCrpFilter();
+  });
+  document.getElementById('sl-filter-ats').addEventListener('input',e=>{
+    filterAtsPct = parseInt(e.target.value)/100;
+    document.getElementById('v-filter-ats').textContent = pctLabel(parseInt(e.target.value));
+    applyCrpFilter();
+  });
+  document.getElementById('sl-filter-ors').addEventListener('input',e=>{
+    filterOrsPct = parseInt(e.target.value)/100;
+    document.getElementById('v-filter-ors').textContent = pctLabel(parseInt(e.target.value));
+    applyCrpFilter();
+  });
+  document.getElementById('sl-filter-maxjut').addEventListener('input',e=>{
+    filterMaxJutPct = parseInt(e.target.value)/100;
+    document.getElementById('v-filter-maxjut').textContent = pctLabel(parseInt(e.target.value));
+    applyCrpFilter();
+  });
+  document.getElementById('sl-filter-maxats').addEventListener('input',e=>{
+    filterMaxAtsPct = parseInt(e.target.value)/100;
+    document.getElementById('v-filter-maxats').textContent = pctLabel(parseInt(e.target.value));
+    applyCrpFilter();
+  });
+  // 世界库前端不提供“隐藏外卡通道 / 隐藏未扩展山峰”开关；相关过滤保持关闭。
+  hideWildcard = false;
+  hideUnexpanded = false;
+  document.getElementById('sl-jmean-peak-opacity').addEventListener('input',e=>{
+    jmeanPeakOpacity = parseInt(e.target.value)/100;
+    document.getElementById('v-jmean-peak-opacity').textContent=e.target.value+'%';
+    if(map.getLayer('fill-jmean-peak')){
+      map.setPaintProperty('fill-jmean-peak','fill-opacity',
+        ['*', jmeanPeakOpacity, ['interpolate',['linear'],['get','rank_pct'],0,1,1,.4]]);
+    }
+  });
+  // 基座圆透明度
+  document.getElementById('sl-ats-peak-opacity').addEventListener('input',e=>{
+    atsPeakOpacity = parseInt(e.target.value)/100;
+    document.getElementById('v-ats-peak-opacity').textContent=e.target.value+'%';
+    if(map.getLayer('fill-ats-peak-circle')){
+      map.setPaintProperty('fill-ats-peak-circle','fill-opacity',
+        ['*', atsPeakOpacity*0.7, ['interpolate',['linear'],['get','rank_pct'],0,.8,1,.3]]);
+    }
+  });
+  document.getElementById('sl-marginal-opacity').addEventListener('input',e=>{
+    marginalOpacity = parseInt(e.target.value)/100;
+    document.getElementById('v-marginal-opacity').textContent=e.target.value+'%';
+    if(map.getLayer('fill-ats-marginal-circle')){
+      map.setPaintProperty('fill-ats-marginal-circle','fill-opacity',
+        ['*', marginalOpacity*0.65, ['interpolate',['linear'],['coalesce',['get','rank_pct'],0.5],0,.8,1,.3]]);
+    }
+  });
+  // Jut全库击败率筛除（0=不筛，正值=只显示击败率>=该值的）
+
+  document.getElementById('sl-size').addEventListener('input',e=>{
+    dotSize=parseFloat(e.target.value);
+    document.getElementById('v-size').textContent=dotSize;
+    Object.keys(FILES).forEach(ds=>{if(map.getLayer(`dot-${ds}`)) map.setPaintProperty(`dot-${ds}`,'circle-radius',dotR(dotSize));});
+  });
+  document.getElementById('sl-thr').addEventListener('input',e=>{
+    const pct=parseInt(e.target.value);
+    bandThr=pct/100;
+    document.getElementById('v-thr').textContent=pct+'%';
+    document.getElementById('thr-disp').textContent=pct;
+    // 同步快捷按钮状态
+    document.querySelectorAll('.thr-btn').forEach(b=>b.classList.remove('on'));
+    const match=document.getElementById(`thr-${pct}`);
+    if(match) match.classList.add('on');
+    applyBandFilter();
+  });
+}
+
+// ══════════════════════════════════════════════════════════════════
+// 距离段筛选
+// ══════════════════════════════════════════════════════════════════
+function setThr(pct){
+  bandThr=pct/100;
+  document.getElementById('v-thr').textContent=pct+'%';
+  document.getElementById('thr-disp').textContent=pct;
+  document.getElementById('sl-thr').value=pct;
+  document.querySelectorAll('.thr-btn').forEach(b=>b.classList.remove('on'));
+  const el=document.getElementById(`thr-${pct}`);if(el) el.classList.add('on');
+  applyBandFilter();
+}
+
+function setBandMetric(m){
+  bandMetric=m;
+  ['relief','jut','ats','ors'].forEach(k=>{
+    const btn=document.getElementById('mbt-'+k);
+    if(btn) btn.classList.toggle('on', k===m);
+  });
+  applyBandFilter();
+}
+
+
+
+// 供总体表现筛除使用（替代原 syncCircleFilterWithPeaks）
+function syncCircleFilterWithPeaks(){
+  applyAllCircleFilters();
+}
+
+function toggleBand(band,el){
+  const cb=document.getElementById(`cb-${band}`);
+  cb.checked=!cb.checked;
+  if(cb.checked){activeBands.add(band);el.classList.add('on');}
+  else          {activeBands.delete(band);el.classList.remove('on');}
+  document.getElementById('mode-row').classList.toggle('vis',activeBands.size>0);
+  document.getElementById('bp-stats').classList.toggle('vis',activeBands.size>0);
+  document.getElementById('band-cnt').textContent=activeBands.size;
+  applyBandFilter();
+}
+
+function clearBands(){
+  activeBands.clear();
+  BAND_NAMES.forEach(b=>{
+    const cb=document.getElementById(`cb-${b}`);if(cb) cb.checked=false;
+    const bi=document.getElementById(`bi-${b}`);if(bi) bi.classList.remove('on');
+  });
+  document.getElementById('mode-row').classList.remove('vis');
+  document.getElementById('bp-stats').classList.remove('vis');
+  applyBandFilter();
+}
+
+function setMode(m){
+  bandMode=m;
+  document.getElementById('mode-any').classList.toggle('on',m==='any');
+  document.getElementById('mode-all').classList.toggle('on',m==='all');
+  applyBandFilter();
+}
+
+function applyBandFilter(){
+  const propKey = bandMetric==='jut' ? 'band_jut_rp' : bandMetric==='ats' ? 'band_ats_rp' : bandMetric==='ors' ? 'band_ors_rp' : 'band_rp';
+  let total=0;
+  const bandVisibleNames = new Set();  // 经距离段筛选后可见的山峰名
+  Object.keys(allData).forEach(ds=>{
+    const src=map.getSource(`s-${ds}`);if(!src) return;
+    if(activeBands.size===0){
+      src.setData(allData[ds]);
+      total+=allData[ds].features.length;
+      allData[ds].features.forEach(f=>bandVisibleNames.add(f.properties.name));
+    } else {
+      const hits=allData[ds].features.filter(f=>{
+        let bp={};try{bp=JSON.parse(f.properties[propKey]||'{}');}catch{}
+        const passes=[...activeBands].map(b=>{
+          const v=bp[b];
+          return (v!==null&&v!==undefined&&v<=bandThr);
+        });
+        return bandMode==='any'?passes.some(Boolean):passes.every(Boolean);
+      });
+      src.setData({type:'FeatureCollection',features:hits});
+      total+=hits.length;
+      hits.forEach(f=>bandVisibleNames.add(f.properties.name));
+    }
+  });
+  if(activeBands.size>0) document.getElementById('hit-cnt').textContent=total.toLocaleString();
+
+  // 同步圆图层：距离段筛选结果 + ds过滤 + 其他过滤
+  if(activeBands.size===0){
+    // 无距离段筛选，恢复正常
+    applyAllCircleFilters();
+  } else {
+    // 将 bandVisibleNames 注入为额外约束，临时覆盖 crpJut 约束
+    const dsF = currentDsCircleFilter;
+    const bandF = ['in',['get','name'],['literal',[...bandVisibleNames]]];
+    const rankF = null;  // Jut全库击败率筛除已移除
+
+    function buildBandFilter(extraRank){
+      const parts = [dsF, bandF, extraRank].filter(Boolean);
+      if(parts.length===0) return null;
+      if(parts.length===1) return parts[0];
+      return ['all',...parts];
+    }
+
+    ['fill-jmean-peak','stroke-jmean-peak'].forEach(id=>{
+      if(map.getLayer(id)) map.setFilter(id, buildBandFilter(rankF));
+    });
+    ['fill-ats-peak-circle','stroke-ats-peak-circle'].forEach(id=>{
+      if(map.getLayer(id)) map.setFilter(id, buildBandFilter(null));
+    });
+    ['fill-ats-marginal-circle','stroke-ats-marginal-circle'].forEach(id=>{
+      if(map.getLayer(id)) map.setFilter(id, buildBandFilter(null));
+    });
+    if(map.getLayer('dot-jut-base')){
+      const dsNames = new Set();
+      Object.keys(JUT_SOURCES||{}).forEach(ds2=>{
+        const tog = document.getElementById(`tog-${ds2}`);
+        if(!tog || !tog.checked) return;
+        (dsCircleNames[ds2]||new Set()).forEach(n=>dsNames.add(n));
+      });
+      const bpAllowed = [...bandVisibleNames].filter(n=>dsNames.size===0||dsNames.has(n));
+      const bpF = ['in',['get','peak_name'],['literal', bpAllowed]];
+      map.setFilter('dot-jut-base', bpF);
+      map.setFilter('lbl-jut-base', bpF);
+    }
+  }
+}
+
+// ══════════════════════════════════════════════════════════════════
+function rpHue(rp){return Math.round((1-rp)*220)}
+
+function bandBarsHtml(band_rp_json, accentColor){
+  const accent = accentColor||'#60a8ff';
+  let bp={};try{bp=JSON.parse(band_rp_json||'{}');}catch{}
+  let html='<div style="font-size:8.5px;color:#2a4060;padding:2px 14px 2px;letter-spacing:.5px">▸ 各距离段排名击败率</div><div class="pp-bands">';
+  BAND_NAMES.forEach(b=>{
+    const v=bp[b];
+    if(v===null||v===undefined){
+      html+=`<div class="pp-band-r"><span class="pp-band-l">${b}</span><div class="pp-bar-w"></div><span class="pp-band-v" style="color:#182030">—</span><span class="pp-star"></span></div>`;
+    } else {
+      const pct=Math.round((1-v)*100);
+      const color=`hsl(${Math.round((1-v)*220)},68%,52%)`;
+      const hit=v<=bandThr;
+      html+=`<div class="pp-band-r">
+        <span class="pp-band-l">${b}</span>
+        <div class="pp-bar-w"><div class="pp-bar" style="width:${pct}%;background:${color}"></div></div>
+        <span class="pp-band-v" style="color:${color}">${pct}%</span>
+        <span class="pp-star" style="color:${hit?'#ffd700':'transparent'}">${hit?'★':''}</span>
+      </div>`;
+    }
+  });
+  html+='</div>';
+  return html;
+}
+
+function switchTab(el,uid){
+  // 用uid精确定位弹窗容器，完全不依赖SDK生成的类名
+  const w=el.closest('.pp-wrap') || document.getElementById(uid+'-tabs')?.closest('.pp-wrap') || el.closest('.mapboxgl-popup-content') || el.closest('.maptilergl-popup-content');
+  if(!w){ console.warn('switchTab: 找不到容器, uid='+uid); return; }
+  w.querySelectorAll('.chart-tab').forEach(t=>t.classList.remove('active'));
+  w.querySelectorAll('.chart-panel').forEach(p=>p.classList.remove('active'));
+  el.classList.add('active');
+  const t=w.querySelector('#'+el.dataset.tab);if(t) t.classList.add('active');
+  Object.values(chartInstances).forEach(c=>{try{c.resize();}catch{}});
+}
+
+function switchBandTab(metric,uid){
+  ['relief','jut','ats'].forEach(m=>{
+    const btn=document.getElementById(`btb-${m}-${uid}`);
+    const panel=document.getElementById(`bb-${m}-${uid}`);
+    const isOn=(m===metric);
+    if(btn){
+      btn.style.color=isOn?'#80c0ff':'#2a5a90';
+      btn.style.borderBottomColor=isOn?'#60a8ff':'transparent';
+      btn.style.fontWeight=isOn?'700':'400';
+    }
+    if(panel) panel.style.display=isOn?'block':'none';
+  });
+}
+
+function buildCharts(uid,valueRadii,maxRel,meanRl,meanRk,cM,cX,rankRadii=null){
+  const valueR = (Array.isArray(valueRadii)&&valueRadii.length)?valueRadii:[];
+  const rankR = (Array.isArray(rankRadii)&&rankRadii.length)?rankRadii:valueR;
+  const labels=valueR.map(r=>r>=1000?(r/1000).toFixed(r%1000===0?0:1)+'k':String(r));
+  const dg={color:'rgba(90,140,220,.06)'};
+  const tk={font:{size:9},color:'#2a5a90'};
+  const base={responsive:true,maintainAspectRatio:false,animation:{duration:220},plugins:{legend:{display:false}}};
+  const ttBase={backgroundColor:'rgba(6,12,28,.92)',titleColor:'#80c0ff',bodyColor:'#4870a0'};
+
+  const cr=document.getElementById(uid+'-cr');
+  if(cr) chartInstances[uid+'r']=new Chart(cr,{type:'line',
+    data:{labels,datasets:[
+      {label:'平均高差(m)',data:meanRl,borderColor:cM,backgroundColor:cM+'12',
+       borderWidth:2.2,tension:.35,fill:true,pointRadius:3,pointBackgroundColor:cM,order:1},
+      {label:'最大高差(m)',data:maxRel,borderColor:cX,backgroundColor:'transparent',
+       borderWidth:1.4,borderDash:[5,4],tension:.35,fill:false,pointRadius:0,order:2},
+    ]},
+    options:{...base,plugins:{...base.plugins,tooltip:{mode:'index',intersect:false,...ttBase,
+      callbacks:{title:i=>`半径 ${Number(valueR[i[0].dataIndex]).toLocaleString()} m`,
+                 label:i=>`${i.dataset.label}: ${i.raw} m`}}},
+      scales:{x:{...tk,grid:dg,ticks:{...tk,maxRotation:40}},
+              y:{...tk,grid:dg,title:{display:true,text:'高差 (m)',font:{size:9},color:'#2a5a90'}}}}
+  });
+
+  if(meanRk.length){
+    const ck=document.getElementById(uid+'-ck');
+    if(ck) chartInstances[uid+'k']=new Chart(ck,{type:'line',
+      data:{labels:rankR.map(r=>r>=1000?(r/1000).toFixed(r%1000===0?0:1)+'k':String(r)),datasets:[{label:'排名',data:meanRk,borderColor:cM,backgroundColor:cM+'12',
+        borderWidth:2.2,tension:.35,fill:true,pointRadius:3,pointBackgroundColor:cM}]},
+      options:{...base,plugins:{...base.plugins,tooltip:{...ttBase,
+        callbacks:{title:i=>`半径 ${Number(rankR[i[0].dataIndex]).toLocaleString()} m`,
+                   label:i=>`排名：第 ${i.raw} 名`}}},
+        scales:{x:{...tk,grid:dg,ticks:{...tk,maxRotation:40}},
+                y:{reverse:true,...tk,grid:dg,title:{display:true,text:'排名（越小越优）',font:{size:9},color:'#2a5a90'}}}}
+    });
+  }
+}
+
+function buildJutChart(uid, profile){
+  const canvas = document.getElementById(uid+'-jc');
+  if(!canvas) return;
+  const labels = profile.radii.map(r=>r>=1000?(r/1000).toFixed(r%1000===0?0:1)+'k':String(r));
+  const dg = {color:'rgba(0,80,50,.12)'};
+  const tk = {font:{size:9},color:'#2a6a4a'};
+  chartInstances[uid+'j'] = new Chart(canvas,{type:'line',
+    data:{labels,datasets:[
+      {label:'平均Jut',data:profile.mean_juts,borderColor:'#40ffa0',backgroundColor:'rgba(64,255,160,.1)',
+       borderWidth:2.2,tension:.35,fill:true,pointRadius:2,pointBackgroundColor:'#40ffa0',order:1},
+      {label:'最大Jut',data:profile.max_juts,borderColor:'#ffd700',backgroundColor:'transparent',
+       borderWidth:1.4,borderDash:[5,4],tension:.35,fill:false,pointRadius:0,order:2},
+    ]},
+    options:{responsive:true,maintainAspectRatio:false,animation:{duration:220},
+      plugins:{legend:{display:false},
+        tooltip:{mode:'index',intersect:false,
+          backgroundColor:'rgba(0,20,12,.92)',titleColor:'#40ffa0',bodyColor:'#3a7a5a',
+          callbacks:{
+            title:i=>`半径 ${Number(profile.radii[i[0].dataIndex]).toLocaleString()} m`,
+            label:i=>`${i.dataset.label}: ${i.raw}`
+          }}},
+      scales:{
+        x:{...tk,grid:dg,ticks:{...tk,maxRotation:40}},
+        y:{...tk,grid:dg,title:{display:true,text:'Jut',font:{size:9},color:'#2a6a4a'}}
+      }}
+  });
+}
+
+function buildJutRankChart(uid, radii, jutRankData){
+  const canvas = document.getElementById(uid+'-jkc');
+  if(!canvas||!jutRankData||!jutRankData.length) return;
+  const labels = radii.map(r=>r>=1000?(r/1000).toFixed(r%1000===0?0:1)+'k':String(r));
+  const dg={color:'rgba(0,80,50,.08)'};
+  const tk={font:{size:9},color:'#2a6a4a'};
+  chartInstances[uid+'jk']=new Chart(canvas,{type:'line',
+    data:{labels,datasets:[{label:'Jut排名',data:jutRankData,borderColor:'#40ffa0',backgroundColor:'rgba(64,255,160,.1)',
+      borderWidth:2.2,tension:.35,fill:true,pointRadius:2,pointBackgroundColor:'#40ffa0'}]},
+    options:{responsive:true,maintainAspectRatio:false,animation:{duration:220},
+      plugins:{legend:{display:false},tooltip:{mode:'index',intersect:false,
+        backgroundColor:'rgba(0,20,12,.92)',titleColor:'#40ffa0',bodyColor:'#3a7a5a',
+        callbacks:{title:i=>`半径 ${Number(radii[i[0].dataIndex]).toLocaleString()} m`,
+                   label:i=>`Jut排名：第 ${i.raw} 名`}}},
+      scales:{x:{...tk,grid:dg,ticks:{...tk,maxRotation:40}},
+              y:{reverse:true,...tk,grid:dg,title:{display:true,text:'Jut排名（越小越优）',font:{size:9},color:'#2a6a4a'}}}}
+  });
+}
+
+function buildAtsChart(uid, valueRadii, atsData, atsRankData, rankRadii=null){
+  const labels = valueRadii.map(r=>r>=1000?(r/1000).toFixed(r%1000===0?0:1)+'k':String(r));
+  const rankR = (Array.isArray(rankRadii)&&rankRadii.length)?rankRadii:valueRadii;
+  const dg={color:'rgba(0,60,100,.12)'};
+  const tk={font:{size:9},color:'#2a5a7a'};
+  const base={responsive:true,maintainAspectRatio:false,animation:{duration:220},
+    plugins:{legend:{display:false}}};
+  const ttBase={backgroundColor:'rgba(0,12,28,.92)',titleColor:'#60c8ff',bodyColor:'#3a5a7a'};
+
+  const ac=document.getElementById(uid+'-ac');
+  if(ac&&atsData&&atsData.length) chartInstances[uid+'a']=new Chart(ac,{type:'line',
+    data:{labels,datasets:[{label:'ATS(m)',data:atsData,borderColor:'#60c8ff',backgroundColor:'rgba(96,200,255,.1)',
+      borderWidth:2.2,tension:.35,fill:true,pointRadius:2,pointBackgroundColor:'#60c8ff'}]},
+    options:{...base,plugins:{...base.plugins,tooltip:{mode:'index',intersect:false,...ttBase,
+      callbacks:{title:i=>`半径 ${Number(valueRadii[i[0].dataIndex]).toLocaleString()} m`,
+                 label:i=>`ATS: ${i.raw} m`}}},
+      scales:{x:{...tk,grid:dg,ticks:{...tk,maxRotation:40}},
+              y:{...tk,grid:dg,title:{display:true,text:'ATS (m)',font:{size:9},color:'#2a5a7a'}}}}
+  });
+
+  const akc=document.getElementById(uid+'-akc');
+  if(akc&&atsRankData&&atsRankData.length) chartInstances[uid+'ak']=new Chart(akc,{type:'line',
+    data:{labels:rankR.map(r=>r>=1000?(r/1000).toFixed(r%1000===0?0:1)+'k':String(r)),datasets:[{label:'ATS排名',data:atsRankData,borderColor:'#60c8ff',backgroundColor:'rgba(96,200,255,.1)',
+      borderWidth:2.2,tension:.35,fill:true,pointRadius:2,pointBackgroundColor:'#60c8ff'}]},
+    options:{...base,plugins:{...base.plugins,tooltip:{mode:'index',intersect:false,...ttBase,
+      callbacks:{title:i=>`半径 ${Number(rankR[i[0].dataIndex]).toLocaleString()} m`,
+                 label:i=>`ATS排名：第 ${i.raw} 名`}}},
+      scales:{x:{...tk,grid:dg,ticks:{...tk,maxRotation:40}},
+              y:{reverse:true,...tk,grid:dg,title:{display:true,text:'ATS排名（越小越优）',font:{size:9},color:'#2a5a7a'}}}}
+  });
+}
+</script>
+<!-- ═══════════════════════════════════════════════════════════
+     总述图表弹窗
+     ═══════════════════════════════════════════════════════════ -->
+<div id="stats-modal" style="display:none;position:fixed;inset:0;z-index:3000;background:rgba(0,5,20,.88);backdrop-filter:blur(4px)">
+  <div style="position:absolute;inset:0;overflow-y:auto;-webkit-overflow-scrolling:touch">
+  <div style="max-width:900px;margin:20px auto;padding:0 14px 36px">
+    <!-- 标题栏 -->
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 0 10px">
+      <span style="font-size:15px;font-weight:700;color:#c0e0ff;letter-spacing:.5px">📊 数据库总述图表</span>
+      <button onclick="closeStatsModal()" style="background:rgba(255,255,255,.08);border:none;color:#7090b0;font-size:18px;width:32px;height:32px;border-radius:50%;cursor:pointer;line-height:32px">✕</button>
+    </div>
+    <!-- 库选择器 -->
+    <div style="background:rgba(10,20,50,.7);border:1px solid rgba(90,140,220,.2);border-radius:10px;padding:10px 14px;margin-bottom:12px">
+      <div style="font-size:10px;color:#4a7aaa;margin-bottom:7px;letter-spacing:.4px">选择要显示的库（可多选对比）</div>
+      <div id="stats-ds-selector" style="display:flex;flex-wrap:wrap;gap:6px"></div>
+    </div>
+    <!-- 指标选择器 -->
+    <div style="background:rgba(10,20,50,.7);border:1px solid rgba(90,140,220,.2);border-radius:10px;padding:10px 14px;margin-bottom:12px">
+      <div style="font-size:10px;color:#4a7aaa;margin-bottom:8px;letter-spacing:.4px">指标选择</div>
+      <div style="font-size:9px;color:#3a6080;margin-bottom:5px">全局指标</div>
+      <div id="metric-btns-global" style="display:flex;flex-wrap:wrap;gap:5px;margin-bottom:9px"></div>
+      <div style="font-size:9px;color:#3a6080;margin-bottom:5px">距离段指标（选指标后再选距离段）</div>
+      <div id="metric-btns-band" style="display:flex;flex-wrap:wrap;gap:5px;margin-bottom:7px"></div>
+      <div id="band-selector-row" style="display:none;flex-wrap:wrap;gap:5px;align-items:center;margin-top:5px">
+        <span style="font-size:9px;color:#3a6080">距离段：</span>
+      </div>
+    </div>
+
+    <!-- 图表类型 -->
+    <div style="background:rgba(10,20,50,.7);border:1px solid rgba(90,140,220,.2);border-radius:10px;padding:10px 14px;margin-bottom:12px">
+      <div style="font-size:10px;color:#4a7aaa;margin-bottom:8px;letter-spacing:.4px">图表类型</div>
+      <div style="display:flex;flex-wrap:wrap;gap:6px;align-items:center">
+        <button id="stats-mode-hist" onclick="setStatsChartMode('hist')" style="padding:4px 11px;font-size:9.5px;border-radius:12px;cursor:pointer;border:1px solid rgba(128,192,255,.5);background:rgba(128,192,255,.2);color:#80c0ff">分布频率</button>
+        <button id="stats-mode-top10" onclick="setStatsChartMode('top10')" style="padding:4px 11px;font-size:9.5px;border-radius:12px;cursor:pointer;border:1px solid rgba(90,140,220,.15);background:rgba(255,255,255,.04);color:#4a7aaa">前10名山峰</button>
+        <span id="stats-mode-note" style="font-size:9px;color:#3a6080">多选库时显示多库合并分布；前10名模式下多选库则合并排序。</span>
+      </div>
+    </div>
+    <!-- 单张图表区 -->
+    <div style="background:rgba(10,20,50,.7);border:1px solid rgba(90,140,220,.2);border-radius:10px;padding:16px 18px">
+      <div id="stats-chart-title" style="font-size:12px;color:#80c0ff;font-weight:700;margin-bottom:12px;letter-spacing:.4px">请选择指标</div>
+      <div style="height:420px;position:relative"><canvas id="stats-main-canvas"></canvas></div>
+    </div>
+  </div>
+  </div>
+</div>
+<script>
+// ══════════════════════════════════════════════════════════════
+// 总述图表模块（单图+切换模式）
+// ══════════════════════════════════════════════════════════════
+
+// 距离段 → 半径范围映射
+const BAND_RADIUS = {
+  '125 m - 500 m': [125, 500],
+  '625 m - 1250 m': [625, 1250],
+  '1375 m - 2000 m': [1375, 2000],
+  '2250 m - 3500 m': [2250, 3500],
+  '3750 m - 5000 m': [3750, 5000],
+  '5250 m - 7000 m': [5250, 7000],
+  '7250 m - 10000 m': [7250, 10000],
+  '10000 m - 18000 m': [10000, 18000],
+  '19000 m - 34000 m': [19000, 34000],
+};
+
+// 全局指标定义
+const GLOBAL_METRICS = [
+  { id:'max_jut',    label:'最大Jut',   unit:'m',  field:'max_jut',      src:'prop' },
+  { id:'max_mean_jut', label:'最大均Jut', unit:'m',  field:'max_mean_jut', src:'prop' },
+  { id:'max_fsi',    label:'最大FSI',   unit:'',   field:'max_fsi',      src:'prop' },
+  { id:'max_ats',    label:'最大ATS',   unit:'m',  field:'max_ats',      src:'prop' },
+  { id:'elev',       label:'海拔',      unit:'m',  field:'elev',         src:'prop' },
+  { id:'mean_jut',   label:'均Jut均值', unit:'m',  field:'chart_mean_jut', src:'chart_avg', rField:'chart_r_jut' },
+  { id:'mean_ats',   label:'均ATS均值', unit:'m',  field:'chart_ats',    src:'chart_avg', rField:'chart_r' },
+  { id:'r_jmean_peak', label:'平均突起响应半径', unit:'m', field:'r_jmean_peak', src:'prop' },
+  { id:'r_ats_peak', label:'ATS峰值响应半径', unit:'m', field:'r_ats_peak', src:'prop' },
+  { id:'r_ats_marginal', label:'ATS最大边际响应半径', unit:'m', field:'r_ats_marginal', src:'prop' },
+];
+
+// 距离段指标定义
+const BAND_METRICS = [
+  { id:'band_relief', label:'mean_relief', unit:'m',  chartField:'chart_mn',       rFieldKey:'chart_r' },
+  { id:'band_jut',    label:'mean_jut',    unit:'m',  chartField:'chart_mean_jut', rFieldKey:'chart_r_jut' },
+  { id:'band_ats',    label:'ATS',         unit:'m',  chartField:'chart_ats',      rFieldKey:'chart_r' },
+];
+
+// 库显示配置
+const DS_CONFIG = {
+  ribus_p1000: { label:'世界Ribus/P1000库', color:'#40c9a2' },
+  asia_j1000: { label:'亚洲J1000库', color:'#40c9a2' },
+  europe_j1000: { label:'欧洲J1000库', color:'#40c9a2' },
+  north_america_j800: { label:'北美洲J800库', color:'#40c9a2' },
+  south_america_j800: { label:'南美洲J800库', color:'#40c9a2' },
+  africa_j250: { label:'非洲J250库', color:'#40c9a2' },
+  oceania_j250: { label:'大洋洲J250库', color:'#40c9a2' },
+  antarctica_j250: { label:'南极洲J250库', color:'#40c9a2' },
+  highasia_e5800_p950: { label:'高亚洲E5800&P950库', color:'#40c9a2' },
+  southeast_asia_gb: { label:'东南亚GB库', color:'#40c9a2' },
+  japan_100peaks: { label:'日本百名山库', color:'#40c9a2' },
+  japan_j250: { label:'日本J250库', color:'#40c9a2' },
+  korea_j250: { label:'朝鲜半岛J250库', color:'#40c9a2' },
+  malaysia_prominence_110peaks: { label:'马来西亚P110库', color:'#40c9a2' },
+};
+
+let statsChart = null;
+let selectedStatsDsKeys = new Set();
+let currentMetric = null;    // { type:'global'|'band', id, bandName? }
+let statsChartMode = 'hist'; // 'hist' | 'top10'
+
+
+function setStatsChartMode(mode){
+  statsChartMode = mode === 'top10' ? 'top10' : 'hist';
+  const histBtn = document.getElementById('stats-mode-hist');
+  const topBtn = document.getElementById('stats-mode-top10');
+  const note = document.getElementById('stats-mode-note');
+  const onStyle = 'padding:4px 11px;font-size:9.5px;border-radius:12px;cursor:pointer;border:1px solid rgba(128,192,255,.5);background:rgba(128,192,255,.2);color:#80c0ff';
+  const offStyle = 'padding:4px 11px;font-size:9.5px;border-radius:12px;cursor:pointer;border:1px solid rgba(90,140,220,.15);background:rgba(255,255,255,.04);color:#4a7aaa';
+  if(histBtn) histBtn.style.cssText = statsChartMode === 'hist' ? onStyle : offStyle;
+  if(topBtn) topBtn.style.cssText = statsChartMode === 'top10' ? onStyle : offStyle;
+  if(note) note.textContent = statsChartMode === 'top10'
+    ? '显示所选库、所选字段的前10名山峰；多选库时合并排序。'
+    : '显示所选库的指标分布频率；可多选库对比。';
+  if(currentMetric) renderMainChart();
+}
+
+function openStatsModal(){
+  document.getElementById('stats-modal').style.display = 'block';
+  buildDsSelector();
+  buildMetricButtons();
+  if(currentMetric) renderMainChart();
+}
+function closeStatsModal(){
+  document.getElementById('stats-modal').style.display = 'none';
+}
+
+// ── 库选择器 ─────────────────────────────────────────────────
+function buildDsSelector(){
+  const el = document.getElementById('stats-ds-selector');
+  el.innerHTML = '';
+
+  Object.keys(allData).forEach(dsKey => {
+    const cfg = DS_CONFIG[dsKey] || { label:dsKey, color:'#80c0ff' };
+    const cnt = allData[dsKey].features.length;
+    const active = selectedStatsDsKeys.has(dsKey);
+    const btn = document.createElement('button');
+    btn.style.cssText = `padding:4px 10px;font-size:9.5px;border-radius:12px;cursor:pointer;transition:.15s;
+      background:${active ? cfg.color+'33' : 'rgba(255,255,255,.04)'};
+      color:${active ? cfg.color : '#4a7aaa'};
+      border:1px solid ${active ? cfg.color+'66' : 'rgba(90,140,220,.15)'};`;
+    btn.textContent = `${cfg.label} (${cnt})`;
+    btn.onclick = () => {
+      if(selectedStatsDsKeys.has(dsKey)) selectedStatsDsKeys.delete(dsKey);
+      else selectedStatsDsKeys.add(dsKey);
+      buildDsSelector();
+      if(currentMetric) renderMainChart();
+    };
+    el.appendChild(btn);
+  });
+}
+
+// ── 指标按钮 ─────────────────────────────────────────────────
+function buildMetricButtons(){
+  // 全局指标按钮
+  const glEl = document.getElementById('metric-btns-global');
+  glEl.innerHTML = '';
+  GLOBAL_METRICS.forEach(m => {
+    const active = currentMetric && currentMetric.type==='global' && currentMetric.id===m.id;
+    const btn = makeMetricBtn(m.label+(m.unit?` (${m.unit})`:''), active, ()=>{
+      currentMetric = { type:'global', id:m.id };
+      document.getElementById('band-selector-row').style.display='none';
+      buildMetricButtons();
+      renderMainChart();
+    });
+    glEl.appendChild(btn);
+  });
+
+  // 距离段指标按钮
+  const bdEl = document.getElementById('metric-btns-band');
+  bdEl.innerHTML = '';
+  BAND_METRICS.forEach(m => {
+    const active = currentMetric && currentMetric.type==='band' && currentMetric.id===m.id;
+    const btn = makeMetricBtn(m.label+(m.unit?` (${m.unit})`:''), active, ()=>{
+      const curBand = (currentMetric && currentMetric.type==='band') ? currentMetric.bandName : BAND_NAMES[0];
+      currentMetric = { type:'band', id:m.id, bandName: curBand };
+      buildMetricButtons();
+      buildBandButtons();
+      renderMainChart();
+    });
+    bdEl.appendChild(btn);
+  });
+
+  // 如果当前是距离段指标，显示距离段按钮
+  if(currentMetric && currentMetric.type==='band'){
+    buildBandButtons();
+  }
+}
+
+function buildBandButtons(){
+  const row = document.getElementById('band-selector-row');
+  row.style.display = 'flex';
+  // 清除旧按钮（保留第一个span标签）
+  while(row.children.length > 1) row.removeChild(row.lastChild);
+  BAND_NAMES.forEach(band => {
+    const active = currentMetric && currentMetric.bandName === band;
+    const btn = makeMetricBtn(band, active, ()=>{
+      currentMetric.bandName = band;
+      buildBandButtons();
+      renderMainChart();
+    }, true);
+    row.appendChild(btn);
+  });
+}
+
+function makeMetricBtn(label, active, onclick, small=false){
+  const btn = document.createElement('button');
+  btn.style.cssText = `padding:${small?'3px 8px':'4px 11px'};font-size:${small?'8.5px':'9.5px'};border-radius:12px;cursor:pointer;transition:.15s;
+    background:${active ? 'rgba(128,192,255,.2)' : 'rgba(255,255,255,.04)'};
+    color:${active ? '#80c0ff' : '#4a7aaa'};
+    border:1px solid ${active ? 'rgba(128,192,255,.5)' : 'rgba(90,140,220,.15)'};`;
+  btn.textContent = label;
+  btn.onclick = onclick;
+  return btn;
+}
+
+// ── 数据提取 ──────────────────────────────────────────────────
+
+function fmtStatsNumber(v){
+  if(v == null || isNaN(v)) return '—';
+  const n = Number(v);
+  if(Math.abs(n) >= 10000) return n.toLocaleString(undefined,{maximumFractionDigits:0});
+  if(Math.abs(n) >= 1000) return n.toLocaleString(undefined,{maximumFractionDigits:1});
+  if(Math.abs(n) >= 100) return n.toFixed(1);
+  if(Math.abs(n) >= 10) return n.toFixed(2);
+  if(Math.abs(n) >= 1) return n.toFixed(3);
+  return n.toFixed(4);
+}
+
+function featureDisplayName(f){
+  const p = f.properties || {};
+  return peakDisplayName(p) || p.name || p.peak_name || '无名峰';
+}
+
+function meanPositiveSeries(series){
+  const pos = (Array.isArray(series) ? series : [])
+    .map(v => Number(v))
+    .filter(v => v != null && !isNaN(v) && v > 0);
+  if(!pos.length) return null;
+  return pos.reduce((sum,v)=>sum+v,0)/pos.length;
+}
+
+function extractValueItems(dsKey, metric){
+  const features = allData[dsKey]?.features || [];
+  const cfg = DS_CONFIG[dsKey] || { label:dsKey, color:'#80c0ff' };
+  const items = [];
+  features.forEach(f => {
+    const p = f.properties || {};
+    let value = null;
+    if(metric.src === 'prop'){
+      const raw = p[metric.field];
+      value = raw != null ? Number(raw) : null;
+    } else if(metric.src === 'chart_avg'){
+      try { value = meanPositiveSeries(JSON.parse(p[metric.field] || '[]')); } catch { value = null; }
+    }
+    if(value != null && !isNaN(value) && value > 0){
+      items.push({ dsKey, dsLabel: cfg.label, color: cfg.color, name: featureDisplayName(f), value, feature: f });
+    }
+  });
+  return items;
+}
+
+function extractValues(dsKey, metric){
+  return extractValueItems(dsKey, metric).map(x => x.value);
+}
+
+function extractBandValueItems(dsKey, bandMetricDef, bandName){
+  const [rMin, rMax] = BAND_RADIUS[bandName] || [0, Infinity];
+  const cfg = DS_CONFIG[dsKey] || { label:dsKey, color:'#80c0ff' };
+  const items = [];
+  (allData[dsKey]?.features || []).forEach(f => {
+    const p = f.properties || {};
+    try {
+      const radii  = JSON.parse(p[bandMetricDef.rFieldKey] || p.chart_r || '[]');
+      const series = JSON.parse(p[bandMetricDef.chartField] || '[]');
+      const bv = radii.map((r,i) => ({r:Number(r), v:Number(series[i])}))
+        .filter(x => x.r >= rMin && x.r <= rMax && x.v != null && !isNaN(x.v) && x.v > 0);
+      if(bv.length){
+        const value = bv.reduce((sum,x)=>sum+x.v,0)/bv.length;
+        items.push({ dsKey, dsLabel: cfg.label, color: cfg.color, name: featureDisplayName(f), value, feature: f });
+      }
+    } catch{}
+  });
+  return items;
+}
+
+function extractBandValues(dsKey, bandMetricDef, bandName){
+  return extractBandValueItems(dsKey, bandMetricDef, bandName).map(x => x.value);
+}
+
+// ── 主图渲染 ──────────────────────────────────────────────────
+function renderMainChart(){
+  if(!currentMetric) return;
+  const keys = [...selectedStatsDsKeys].filter(k => allData[k]);
+  if(!keys.length) return;
+
+  // 收集各库数据
+  let datasetsList;
+  let titleText;
+
+  if(currentMetric.type === 'global'){
+    const mDef = GLOBAL_METRICS.find(m => m.id === currentMetric.id);
+    if(!mDef) return;
+    titleText = `${mDef.label}${mDef.unit?' ('+mDef.unit+')':''} 分布频率`;
+    datasetsList = keys.map(k => ({
+      key: k,
+      label: (DS_CONFIG[k]||{label:k}).label,
+      values: extractValues(k, mDef)
+    }));
+  } else {
+    const mDef = BAND_METRICS.find(m => m.id === currentMetric.id);
+    if(!mDef) return;
+    const band = currentMetric.bandName || BAND_NAMES[0];
+    titleText = `${mDef.label}${mDef.unit?' ('+mDef.unit+')':''} · ${band} 距离段 分布频率`;
+    datasetsList = keys.map(k => ({
+      key: k,
+      label: (DS_CONFIG[k]||{label:k}).label,
+      values: extractBandValues(k, mDef, band)
+    }));
+  }
+
+  if(statsChartMode === 'top10'){
+    let items = [];
+    if(currentMetric.type === 'global'){
+      const mDef = GLOBAL_METRICS.find(m => m.id === currentMetric.id);
+      keys.forEach(k => { items = items.concat(extractValueItems(k, mDef)); });
+    } else {
+      const mDef = BAND_METRICS.find(m => m.id === currentMetric.id);
+      const band = currentMetric.bandName || BAND_NAMES[0];
+      keys.forEach(k => { items = items.concat(extractBandValueItems(k, mDef, band)); });
+    }
+    drawTop10Chart(items, titleText.replace('分布频率','前10名山峰'));
+  } else {
+    drawMainHist(datasetsList, titleText);
+  }
+}
+
+function drawMainHist(datasetsList, titleText){
+  if(statsChart){ statsChart.destroy(); statsChart = null; }
+  const canvas = document.getElementById('stats-main-canvas');
+  if(!canvas) return;
+
+  const allVals = datasetsList.flatMap(d => d.values);
+  if(!allVals.length){
+    document.getElementById('stats-chart-title').textContent = titleText + ' — 暂无数据';
+    return;
+  }
+  document.getElementById('stats-chart-title').textContent = titleText;
+
+  const BINS = 20;
+  const mn = Math.min(...allVals), mx = Math.max(...allVals);
+  const step = (mx - mn) / BINS || 1;
+
+  const labels = Array.from({length:BINS}, (_,i) => {
+    const v = mn + i*step + step/2;
+    return v >= 10000 ? (v/1000).toFixed(1)+'k' :
+           v >= 1000  ? (v/1000).toFixed(2)+'k' :
+           v < 1      ? v.toFixed(3) :
+           v < 10     ? v.toFixed(2) : v.toFixed(1);
+  });
+
+  const datasets = datasetsList.filter(d => d.values.length > 0).map(d => {
+    const cfg = DS_CONFIG[d.key] || { color:'#80c0ff' };
+    const counts = new Array(BINS).fill(0);
+    d.values.forEach(v => {
+      let i = Math.floor((v - mn) / step);
+      if(i >= BINS) i = BINS-1;
+      if(i >= 0) counts[i]++;
+    });
+    const total = d.values.length;
+    const freqs = counts.map(c => Math.round(c/total*1000)/10);
+    return {
+      label: `${(DS_CONFIG[d.key]||{label:d.key}).label} (n=${total})`,
+      data: freqs,
+      backgroundColor: cfg.color + '44',
+      borderColor: cfg.color + 'cc',
+      borderWidth: 1.5,
+    };
+  });
+
+  statsChart = new Chart(canvas, {
+    type: 'bar',
+    data: { labels, datasets },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      animation: { duration: 250 },
+      plugins: {
+        legend: {
+          display: true,
+          position: 'top',
+          labels: { color:'#7090b0', font:{size:10}, boxWidth:12, padding:10 }
+        },
+        tooltip: {
+          backgroundColor: 'rgba(5,15,40,.92)',
+          titleColor:'#80c0ff', bodyColor:'#c0d8ff',
+          borderColor:'rgba(90,140,220,.3)', borderWidth:1,
+          callbacks: {
+            title: items => `区间中心 ≈ ${labels[items[0].dataIndex]}`,
+            label: i => ` ${i.dataset.label}: ${i.raw}%`
+          }
+        }
+      },
+      scales: {
+        x: {
+          ticks:{ color:'#5080a0', font:{size:10}, maxRotation:35 },
+          grid: { color:'rgba(90,140,220,.07)' },
+          title:{ display:true, text:'值区间', color:'#3a6080', font:{size:10} }
+        },
+        y: {
+          ticks:{ color:'#5080a0', font:{size:10}, callback: v => v+'%' },
+          grid: { color:'rgba(90,140,220,.07)' },
+          title:{ display:true, text:'频率 (%)', color:'#3a6080', font:{size:10} }
+        }
+      }
+    }
+  });
+}
+
+
+function drawTop10Chart(items, titleText){
+  if(statsChart){ statsChart.destroy(); statsChart = null; }
+  const canvas = document.getElementById('stats-main-canvas');
+  if(!canvas) return;
+  const top = (items || [])
+    .filter(x => x.value != null && !isNaN(x.value) && x.value > 0)
+    .sort((a,b) => b.value - a.value)
+    .slice(0, 10);
+  if(!top.length){
+    document.getElementById('stats-chart-title').textContent = titleText + ' — 暂无数据';
+    return;
+  }
+  const dsCount = new Set(top.map(x => x.dsKey)).size;
+  document.getElementById('stats-chart-title').textContent = titleText;
+  const labels = top.map((x, i) => dsCount > 1 ? `${i+1}. ${x.name}｜${x.dsLabel}` : `${i+1}. ${x.name}`);
+  const data = top.map(x => x.value);
+  const colors = top.map(x => (x.color || '#80c0ff') + '66');
+  const borders = top.map(x => (x.color || '#80c0ff') + 'dd');
+  statsChart = new Chart(canvas, {
+    type: 'bar',
+    data: { labels, datasets: [{ label: 'Top 10', data, backgroundColor: colors, borderColor: borders, borderWidth: 1.5, barPercentage: 0.72, categoryPercentage: 0.86 }] },
+    options: {
+      indexAxis: 'y', responsive: true, maintainAspectRatio: false, animation: { duration: 250 },
+      plugins: {
+        legend: { display: false },
+        tooltip: { backgroundColor: 'rgba(5,15,40,.92)', titleColor:'#80c0ff', bodyColor:'#c0d8ff', borderColor:'rgba(90,140,220,.3)', borderWidth:1,
+          callbacks: { title: items => top[items[0].dataIndex]?.name || '', label: i => ` ${top[i.dataIndex].dsLabel}: ${fmtStatsNumber(top[i.dataIndex].value)}` }
+        }
+      },
+      scales: {
+        x: { beginAtZero:true, ticks:{ color:'#5080a0', font:{size:10}, callback:v=>fmtStatsNumber(v) }, grid:{ color:'rgba(90,140,220,.07)' }, title:{ display:true, text:'指标值', color:'#3a6080', font:{size:10} } },
+        y: { ticks:{ color:'#80a8c8', font:{size:10} }, grid:{ color:'rgba(90,140,220,.04)' } }
+      }
+    }
+  });
+}
+
+// 点击弹窗背景关闭
+document.getElementById('stats-modal').addEventListener('click', e => {
+  if(e.target === document.getElementById('stats-modal')) closeStatsModal();
+});
+</script>
+
+<script>
+// ===== ORS patch =====
+(function(){
+  if (Array.isArray(GLOBAL_METRICS) && !GLOBAL_METRICS.some(m=>m.id==='ors_34km')) {
+    GLOBAL_METRICS.splice(3, 0, { id:'ors_34km', label:'34kmORS', unit:'', field:'ors_34km', src:'prop' });
+  }
+  if (Array.isArray(BAND_METRICS) && !BAND_METRICS.some(m=>m.id==='band_ors')) {
+    BAND_METRICS.push({ id:'band_ors', label:'ORS', unit:'', chartField:'chart_ors', rFieldKey:'chart_ors_r' });
+  }
+
+  window.setBandMetric = function(m){
+    bandMetric=m;
+    ['relief','jut','ats','ors'].forEach(k=>{
+      const btn=document.getElementById('mbt-'+k);
+      if(btn) btn.classList.toggle('on', k===m);
+    });
+    applyBandFilter();
+  };
+
+  window.applyBandFilter = function(){
+    const keyMap = { relief:'band_rp', jut:'band_jut_rp', ats:'band_ats_rp', ors:'band_ors_rp' };
+    const propKey = keyMap[bandMetric] || 'band_rp';
+    let total=0;
+    const bandVisibleNames = new Set();
+    Object.keys(allData).forEach(ds=>{
+      const src=map.getSource(`s-${ds}`);if(!src) return;
+      if(activeBands.size===0){
+        src.setData(allData[ds]);
+        total+=allData[ds].features.length;
+        allData[ds].features.forEach(f=>bandVisibleNames.add(f.properties.name));
+      } else {
+        const hits=allData[ds].features.filter(f=>{
+          let bp={};try{bp=JSON.parse(f.properties[propKey]||'{}');}catch{}
+          const passes=[...activeBands].map(b=>{
+            const v=bp[b];
+            return (v!==null&&v!==undefined&&v<=bandThr);
+          });
+          return bandMode==='any'?passes.some(Boolean):passes.every(Boolean);
+        });
+        src.setData({type:'FeatureCollection',features:hits});
+        total+=hits.length;
+        hits.forEach(f=>bandVisibleNames.add(f.properties.name));
+      }
+    });
+    if(activeBands.size>0){
+      const el=document.getElementById('hit-cnt'); if(el) el.textContent=total.toLocaleString();
+    }
+    if(activeBands.size===0){
+      applyAllCircleFilters();
+    } else {
+      const dsF = currentDsCircleFilter;
+      const bandF = ['in',['get','name'],['literal',[...bandVisibleNames]]];
+      function buildBandFilter(extraRank){
+        const parts = [dsF, bandF, extraRank].filter(Boolean);
+        if(parts.length===0) return null;
+        if(parts.length===1) return parts[0];
+        return ['all',...parts];
+      }
+      ['fill-jmean-peak','stroke-jmean-peak'].forEach(id=>{ if(map.getLayer(id)) map.setFilter(id, buildBandFilter(null)); });
+      ['fill-ats-peak-circle','stroke-ats-peak-circle'].forEach(id=>{ if(map.getLayer(id)) map.setFilter(id, buildBandFilter(null)); });
+      ['fill-ats-marginal-circle','stroke-ats-marginal-circle'].forEach(id=>{ if(map.getLayer(id)) map.setFilter(id, buildBandFilter(null)); });
+      if(map.getLayer('dot-jut-base')){
+        const dsNames = new Set();
+        Object.keys(JUT_SOURCES||{}).forEach(ds2=>{
+          const tog = document.getElementById(`tog-${ds2}`);
+          if(!tog || !tog.checked) return;
+          (dsCircleNames[ds2]||new Set()).forEach(n=>dsNames.add(n));
+        });
+        const bpAllowed = [...bandVisibleNames].filter(n=>dsNames.size===0||dsNames.has(n));
+        const bpF = ['in',['get','peak_name'],['literal', bpAllowed]];
+        map.setFilter('dot-jut-base', bpF);
+        map.setFilter('lbl-jut-base', bpF);
+      }
+    }
+  };
+
+  window.switchBandTab = function(metric,uid){
+    ['relief','jut','ats','ors'].forEach(m=>{
+      const btn=document.getElementById(`btb-${m}-${uid}`);
+      const panel=document.getElementById(`bb-${m}-${uid}`);
+      const isOn=(m===metric);
+      if(btn){
+        btn.style.color=isOn?'#80c0ff':'#2a5a90';
+        btn.style.borderBottomColor=isOn?'#60a8ff':'transparent';
+        btn.style.fontWeight=isOn?'700':'400';
+      }
+      if(panel) panel.style.display=isOn?'block':'none';
+    });
+  };
+
+  function buildOrsChart(uid, radii, orsVals){
+    const canvas = document.getElementById(uid+'-oc');
+    if(!canvas || !orsVals || !orsVals.length) return;
+    const labels = radii.map(r=>r>=1000?(r/1000).toFixed(r%1000===0?0:1)+'k':String(r));
+    chartInstances[uid+'o'] = new Chart(canvas,{type:'line',
+      data:{labels,datasets:[{label:'ORS',data:orsVals,borderColor:'#ff9f40',backgroundColor:'rgba(255,159,64,.10)',borderWidth:2.2,tension:.35,fill:true,pointRadius:2,pointBackgroundColor:'#ff9f40'}]},
+      options:{responsive:true,maintainAspectRatio:false,animation:{duration:220},plugins:{legend:{display:false},tooltip:{mode:'index',intersect:false,backgroundColor:'rgba(28,16,0,.92)',titleColor:'#ffcf90',bodyColor:'#d99a55',callbacks:{title:i=>`半径 ${Number(radii[i[0].dataIndex]).toLocaleString()} m`,label:i=>`ORS: ${i.raw}`}}},scales:{x:{grid:{color:'rgba(120,80,0,.10)'},ticks:{font:{size:9},color:'#9b6a24',maxRotation:40}},y:{grid:{color:'rgba(120,80,0,.10)'},ticks:{font:{size:9},color:'#9b6a24'},title:{display:true,text:'ORS',font:{size:9},color:'#9b6a24'}}}}
+    });
+  }
+  function buildOrsRankChart(uid, radii, orsRankData){
+    const canvas = document.getElementById(uid+'-okc');
+    if(!canvas || !orsRankData || !orsRankData.length) return;
+    const labels = radii.map(r=>r>=1000?(r/1000).toFixed(r%1000===0?0:1)+'k':String(r));
+    chartInstances[uid+'ok'] = new Chart(canvas,{type:'line',
+      data:{labels,datasets:[{label:'ORS排名',data:orsRankData,borderColor:'#ff9f40',backgroundColor:'rgba(255,159,64,.10)',borderWidth:2.2,tension:.35,fill:true,pointRadius:2,pointBackgroundColor:'#ff9f40'}]},
+      options:{responsive:true,maintainAspectRatio:false,animation:{duration:220},plugins:{legend:{display:false},tooltip:{mode:'index',intersect:false,backgroundColor:'rgba(28,16,0,.92)',titleColor:'#ffcf90',bodyColor:'#d99a55',callbacks:{title:i=>`半径 ${Number(radii[i[0].dataIndex]).toLocaleString()} m`,label:i=>`ORS排名：第 ${i.raw} 名`}}},scales:{x:{grid:{color:'rgba(120,80,0,.10)'},ticks:{font:{size:9},color:'#9b6a24',maxRotation:40}},y:{reverse:true,grid:{color:'rgba(120,80,0,.10)'},ticks:{font:{size:9},color:'#9b6a24'},title:{display:true,text:'ORS排名（越小越优）',font:{size:9},color:'#9b6a24'}}}}
+    });
+  }
+
+  window.showPopup = function(p,coords,ds){
+    Object.values(chartInstances).forEach(c=>{try{c.destroy();}catch{}});
+    chartInstances={};
+    const peakName=p.name||'';
+  const peakTitle=peakDisplayName(p);
+    const jProf=(jutProfiles[ds]||{})[peakName]||{};
+    const jmeanPeakP=jmeanPeakData[peakName];
+    const atsPeakP=atsPeakCircleData[peakName];
+    const amP=atsMarginalCircleData[peakName];
+    const hasJut=jProf&&jProf.radii&&jProf.radii.length>0;
+
+    const scoreParts=[p.mean_relief_crp,p.mean_jut_crp,p.mean_ats_crp,p.ors_34km_crp,p.max_jut_crp,p.max_ats_crp]
+      .map(v=>v!=null && v!=='' && !Number.isNaN(parseFloat(v)) ? parseFloat(v) : null)
+      .filter(v=>v!==null);
+    const rp=scoreParts.length ? scoreParts.reduce((a,b)=>a+b,0)/scoreParts.length : (p.rp!=null ? parseFloat(p.rp) : 0.5);
+    const hue=rpHue(rp);
+    const cM=`hsl(${hue},72%,58%)`,cX=`hsl(${hue},44%,72%)`;
+    const uid='pp'+Date.now();
+    const sCol=DS_COLOR[ds]||'#60a8ff',sLbl=DS_LABEL[ds]||ds;
+    const radii=JSON.parse(p.chart_r||'[]'),maxRel=JSON.parse(p.chart_mx||'[]'),meanRl=JSON.parse(p.chart_mn||'[]'),meanRk=JSON.parse(p.chart_rk||'[]');
+    const hasC=radii.length>0,hasRk=meanRk.length>0;
+    const orsRadii=JSON.parse(p.chart_ors_r||'[]');
+    const orsVals=JSON.parse(p.chart_ors||'[]');
+    const orsRanks=JSON.parse(p.chart_ors_rk||'[]');
+    const hasOrs=orsRadii.length>0 && orsVals.length>0;
+
+    const mrCrp  = p.mean_relief_crp!=null ? Math.round((1-parseFloat(p.mean_relief_crp))*100) : null;
+    const mjCrp  = p.mean_jut_crp!=null    ? Math.round((1-parseFloat(p.mean_jut_crp))*100)    : null;
+    const maCrp  = p.mean_ats_crp!=null    ? Math.round((1-parseFloat(p.mean_ats_crp))*100)    : null;
+    const orsCrp = p.ors_34km_crp!=null    ? Math.round((1-parseFloat(p.ors_34km_crp))*100)    : null;
+    const mjxCrp = p.max_jut_crp!=null     ? Math.round((1-parseFloat(p.max_jut_crp))*100)     : null;
+    const maxCrp = p.max_ats_crp!=null     ? Math.round((1-parseFloat(p.max_ats_crp))*100)     : null;
+    const fmtPct = v => (v===null||v===undefined)?'—':`${v}%`;
+    const ors10 = p.ors_34km!=null ? Number(p.ors_34km).toFixed(2) : '—';
+    const ors10Rank = p.ors_34km_rank!=null ? `#${p.ors_34km_rank}` : '—';
+    const bestOrsRank = p.best_ors_rank!=null ? `#${p.best_ors_rank}` : '—';
+    const bestOrsRadius = p.best_ors_radius!=null ? `${Number(p.best_ors_radius).toLocaleString()} m` : '—';
+
+    const maxJut = p.max_jut!=null ? parseFloat(p.max_jut).toFixed(2) : '—';
+    const maxMeanJut = p.max_mean_jut!=null ? parseFloat(p.max_mean_jut).toFixed(2) : (jmeanPeakP&&jmeanPeakP.max_mean_jut!=null ? Number(jmeanPeakP.max_mean_jut).toFixed(2) : '—');
+    const maxMeanJutR = p.max_mean_jut_peak_radius!=null ? `${parseInt(p.max_mean_jut_peak_radius).toLocaleString()} m` : (jmeanPeakP&&jmeanPeakP.radius_m!=null ? `${Number(jmeanPeakP.radius_m).toLocaleString()} m` : '—');
+    const mmjRp = (p.max_mean_jut_peak_rp!=null && p.max_mean_jut>0) ? Math.round((1-parseFloat(p.max_mean_jut_peak_rp))*100) : null;
+    const maxFsi = p.max_fsi!=null ? parseFloat(p.max_fsi).toFixed(4) : '—';
+    const maxFsiR = p.max_fsi_r!=null ? `${parseInt(p.max_fsi_r).toLocaleString()} m` : '—';
+    const maxAts = p.max_ats!=null ? parseFloat(p.max_ats).toFixed(2) : (atsPeakP&&atsPeakP.max_ats!=null ? Number(atsPeakP.max_ats).toFixed(2) : '—');
+    const maxAtsR = p.max_ats_peak_radius!=null ? `${parseInt(p.max_ats_peak_radius).toLocaleString()} m` : (atsPeakP&&atsPeakP.radius_m!=null ? `${Number(atsPeakP.radius_m).toLocaleString()} m` : '—');
+    const maxAtsRp = (p.max_ats_peak_rp!=null && p.max_ats>0) ? Math.round((1-parseFloat(p.max_ats_peak_rp))*100) : null;
+    const rProm = p.r_jmean_peak!=null ? `${parseInt(p.r_jmean_peak).toLocaleString()} m` : (jmeanPeakP&&jmeanPeakP.radius_m!=null ? `${Number(jmeanPeakP.radius_m).toLocaleString()} m` : '—');
+    const rBase = p.r_ats_peak!=null ? `${parseInt(p.r_ats_peak).toLocaleString()} m` : (atsPeakP&&atsPeakP.radius_m!=null ? `${Number(atsPeakP.radius_m).toLocaleString()} m` : '—');
+    const ownAmValid = isValidAtsMarginalProps(p);
+    const rAtsMarginal = ownAmValid ? `${Number(p.r_ats_marginal).toLocaleString()} m` : (isValidAtsMarginalProps(amP) ? `${Number(amP.radius_m ?? amP.r_ats_marginal).toLocaleString()} m` : '—');
+    const atsConf = p.ats_conf != null ? parseFloat(p.ats_conf) : null;
+    const jutConf = p.jut_conf != null ? parseFloat(p.jut_conf) : null;
+
+    function confBadge(conf, label) {
+      if(conf===null) return '';
+      const pct = Math.round(conf*100);
+      const hue = Math.round(conf*120);
+      const tag = conf>=0.5?'高':conf>=0.25?'中':'低';
+      return `<span style="font-size:9px;color:hsl(${hue},70%,55%);font-weight:700" title="折线峰值置信度：${pct}%（越高说明${label}越明确）">置信${tag}(${pct}%)</span>`;
+    }
+    function crpBadge(pct){
+      if(pct===null) return '<span style="color:#2a4060">—</span>';
+      const hue=Math.round(pct*2.2);
+      return `<span style="color:hsl(${hue},72%,58%);font-weight:700;font-family:monospace">${pct}%</span>`;
+    }
+
+    const html=`
+<div class="pp-wrap">
+<div class="pp-hd"><span>${peakTitle||'无名峰'}</span><span class="pp-src" style="background:${sCol}22;color:${sCol};border:1px solid ${sCol}44">${sLbl}</span></div>
+<div class="pp-body">
+  <div class="pp-row"><span>海拔</span><span class="pp-val">${p.elev!=null?p.elev+' m':'—'}</span></div>
+  <div class="pp-row"><span>库内综合击败率</span><span class="pp-val" style="color:hsl(${hue},72%,62%)">${((1-rp)*100).toFixed(1)} %</span></div>
+  ${p.region?`<div class="pp-row"><span>所属地区</span><span class="pp-val" style="color:#80a0c0">${p.region}</span></div>`:''}
+</div>
+<div style="padding:4px 14px 6px;background:rgba(20,30,60,.3);border-top:1px solid rgba(90,140,220,.1)">
+  <div style="font-size:8.5px;color:#2a4060;margin-bottom:5px;letter-spacing:.5px">▸ 综合排名击败率</div>
+  <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:3px;margin-bottom:3px">
+    <div style="text-align:center;background:rgba(90,140,220,.06);padding:4px 2px;border-radius:5px"><div style="font-size:8px;color:#2a4060">高差均值</div>${crpBadge(mrCrp)}</div>
+    <div style="text-align:center;background:rgba(0,200,100,.06);padding:4px 2px;border-radius:5px"><div style="font-size:8px;color:#2a6a4a">Jut均值</div>${crpBadge(mjCrp)}</div>
+    <div style="text-align:center;background:rgba(0,150,255,.06);padding:4px 2px;border-radius:5px"><div style="font-size:8px;color:#2a5a7a">ATS均值</div>${crpBadge(maCrp)}</div>
+    <div style="text-align:center;background:rgba(255,160,64,.08);padding:4px 2px;border-radius:5px"><div style="font-size:8px;color:#8a5a20">34kmORS</div>${crpBadge(orsCrp)}</div>
+  </div>
+  <div style="font-size:8.5px;color:#2a4060;margin-bottom:3px;letter-spacing:.5px">▸ 峰值排名击败率</div>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:3px;margin-bottom:5px">
+    <div style="text-align:center;background:rgba(0,200,100,.08);padding:4px 2px;border-radius:5px"><div style="font-size:8px;color:#2a6a4a">最大Jut峰值</div>${crpBadge(mjxCrp)}</div>
+    <div style="text-align:center;background:rgba(0,150,255,.08);padding:4px 2px;border-radius:5px"><div style="font-size:8px;color:#2a5a7a">最大ATS峰值</div>${crpBadge(maxCrp)}</div>
+  </div>
+  <div style="font-size:8.5px;color:#2a4060;margin-bottom:3px;letter-spacing:.5px">▸ 峰值 / 关键指标</div>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:3px 10px">
+    <div class="pp-row" style="margin:0"><span style="color:#8a5a20;font-size:10px">34kmORS数值</span><span style="color:#ffb04d;font-weight:700;font-family:monospace;font-size:11px">${ors10}</span></div>
+    <div class="pp-row" style="margin:0"><span style="color:#8a5a20;font-size:10px">34kmORS排名</span><span style="color:#ffb04d;font-family:monospace;font-size:11px">${ors10Rank}</span></div>
+    <div class="pp-row" style="margin:0"><span style="color:#8a5a20;font-size:10px">ORS最大排名</span><span style="color:#ffb04d;font-family:monospace;font-size:11px">${bestOrsRank}</span></div>
+    <div class="pp-row" style="margin:0"><span style="color:#8a5a20;font-size:10px">↑ 对应半径</span><span style="color:#ffb04d;font-family:monospace;font-size:11px">${bestOrsRadius}</span></div>
+    <div class="pp-row" style="margin:0"><span style="color:#3a7a5a;font-size:10px">最大Jut</span><span style="color:#40ffa0;font-weight:700;font-family:monospace;font-size:11px">${maxJut}</span></div>
+    <div class="pp-row" style="margin:0"><span style="color:#3a7a5a;font-size:10px">最大均Jut</span><span style="color:#40ffa0;font-weight:700;font-family:monospace;font-size:11px">${maxMeanJut}</span></div>
+    <div class="pp-row" style="margin:0"><span style="color:#6a5a30;font-size:10px">↑ 对应半径</span><span style="color:#ffd700;font-family:monospace;font-size:10px">${maxMeanJutR}</span></div>
+    <div class="pp-row" style="margin:0"><span style="color:#3a7a5a;font-size:10px">↑ 全库击败</span><span style="color:#40ffa0;font-family:monospace;font-size:10px">${fmtPct(mmjRp)}</span></div>
+    <div class="pp-row" style="margin:0"><span style="color:#6a5a7a;font-size:10px">最大FSI</span><span style="color:#c0a0ff;font-weight:700;font-family:monospace;font-size:11px">${maxFsi}</span></div>
+    <div class="pp-row" style="margin:0"><span style="color:#6a5a7a;font-size:10px">↑ 对应半径</span><span style="color:#c0a0ff;font-family:monospace;font-size:10px">${maxFsiR}</span></div>
+    <div class="pp-row" style="margin:0"><span style="color:#2a5a7a;font-size:10px">最大ATS</span><span style="color:#60c8ff;font-weight:700;font-family:monospace;font-size:11px">${maxAts}</span></div>
+    <div class="pp-row" style="margin:0"><span style="color:#2a5a7a;font-size:10px">↑ 对应半径</span><span style="color:#60c8ff;font-family:monospace;font-size:10px">${maxAtsR}</span></div>
+    <div class="pp-row" style="margin:0"><span style="color:#2a5a7a;font-size:10px">ATS全库击败</span><span style="color:#60c8ff;font-family:monospace;font-size:10px">${fmtPct(maxAtsRp)}</span></div>
+    <div class="pp-row" style="margin:0"><span style="color:#3a7a5a;font-size:10px">最大Jut峰值</span><span style="color:#40ffa0;font-family:monospace;font-size:10px">${fmtPct(mjxCrp)}</span></div>
+    <div class="pp-row" style="margin:0;border-top:1px solid rgba(90,140,220,.08);padding-top:3px"><span style="color:#6a5a30;font-size:10px">平均突起响应半径</span><span style="color:#ffd700;font-weight:700;font-family:monospace;font-size:11px">${rProm}</span><span style="margin-left:6px">${confBadge(jutConf,'平均突起响应半径')}</span></div>
+    <div class="pp-row" style="margin:0;padding-top:2px"><span style="color:#2a5a7a;font-size:10px">ATS峰值响应半径</span><span style="color:#60c8ff;font-weight:700;font-family:monospace;font-size:11px">${rBase}</span><span style="margin-left:6px">${confBadge(atsConf,'ATS峰值响应半径')}</span></div>
+    <div class="pp-row" style="margin:0;padding-top:2px"><span style="color:#8a5a20;font-size:10px">ATS最大边际响应半径</span><span style="color:#ffb347;font-weight:700;font-family:monospace;font-size:11px">${rAtsMarginal}</span></div>
+  </div>
+</div>
+<hr class="pp-sep">
+<div style="display:flex;border-bottom:1px solid rgba(90,140,220,.1);padding:0 12px;gap:1px">
+  <div onclick="switchBandTab('relief','${uid}')" id="btb-relief-${uid}" style="flex:1;padding:4px 0;text-align:center;font-size:10px;color:#80c0ff;border-bottom:2px solid #60a8ff;margin-bottom:-1px;cursor:pointer;font-weight:700">高差段</div>
+  <div onclick="switchBandTab('jut','${uid}')" id="btb-jut-${uid}" style="flex:1;padding:4px 0;text-align:center;font-size:10px;color:#2a5a90;border-bottom:2px solid transparent;margin-bottom:-1px;cursor:pointer">Jut段</div>
+  <div onclick="switchBandTab('ats','${uid}')" id="btb-ats-${uid}" style="flex:1;padding:4px 0;text-align:center;font-size:10px;color:#2a5a90;border-bottom:2px solid transparent;margin-bottom:-1px;cursor:pointer">ATS段</div>
+  <div onclick="switchBandTab('ors','${uid}')" id="btb-ors-${uid}" style="flex:1;padding:4px 0;text-align:center;font-size:10px;color:#2a5a90;border-bottom:2px solid transparent;margin-bottom:-1px;cursor:pointer">ORS段</div>
+</div>
+<div id="bb-relief-${uid}">${bandBarsHtml(p.band_rp,'#80c0ff')}</div>
+<div id="bb-jut-${uid}" style="display:none">${bandBarsHtml(p.band_jut_rp,'#40ffa0')}</div>
+<div id="bb-ats-${uid}" style="display:none">${bandBarsHtml(p.band_ats_rp,'#60c8ff')}</div>
+<div id="bb-ors-${uid}" style="display:none">${bandBarsHtml(p.band_ors_rp,'#ffb04d')}</div>
+${hasC?`
+<hr class="pp-sep" style="margin:3px 0">
+<div class="chart-tabs">
+  <div class="chart-tab active" data-tab="${uid}-r" onclick="switchTab(this,'${uid}')">📈 高差</div>
+  ${hasRk?`<div class="chart-tab" data-tab="${uid}-k" onclick="switchTab(this,'${uid}')">📊 高差排名</div>`:''}
+  ${hasJut?`<div class="chart-tab" data-tab="${uid}-j" onclick="switchTab(this,'${uid}')">🌿 Jut</div>`:''}
+  ${hasJut?`<div class="chart-tab" data-tab="${uid}-jk" onclick="switchTab(this,'${uid}')">📊 Jut排名</div>`:''}
+  <div class="chart-tab" data-tab="${uid}-a" onclick="switchTab(this,'${uid}')">⚡ ATS</div>
+  <div class="chart-tab" data-tab="${uid}-ak" onclick="switchTab(this,'${uid}')">📊 ATS排名</div>
+  ${hasOrs?`<div class="chart-tab" data-tab="${uid}-o" onclick="switchTab(this,'${uid}')">🟠 ORS</div>`:''}
+  ${hasOrs?`<div class="chart-tab" data-tab="${uid}-ok" onclick="switchTab(this,'${uid}')">📊 ORS排名</div>`:''}
+</div>
+<div id="${uid}-r" class="chart-panel active"><div class="chart-leg"><div class="cl-i"><div class="cl-ln" style="background:${cM}"></div><span>平均高差</span></div><div class="cl-i"><div class="cl-ln" style="background:${cX};opacity:.8;border-top:2px dashed ${cX};height:0"></div><span>最大高差</span></div></div><canvas id="${uid}-cr" class="cc"></canvas><div class="chart-note">X：搜索半径 (m) | Y：高差 (m)</div></div>
+${hasRk?`<div id="${uid}-k" class="chart-panel"><canvas id="${uid}-ck" class="cc"></canvas><div class="chart-note">X：搜索半径 | Y：高差排名（Y轴反转）</div></div>`:''}
+${hasJut?`<div id="${uid}-j" class="chart-panel"><div class="chart-leg"><div class="cl-i"><div class="cl-ln" style="background:#40ffa0"></div><span style="color:#3a7a5a">平均Jut</span></div><div class="cl-i"><div class="cl-ln" style="background:#ffd700;opacity:.8;border-top:2px dashed #ffd700;height:0"></div><span style="color:#7a7040">最大Jut</span></div></div><canvas id="${uid}-jc" class="cc"></canvas><div class="chart-note">X：搜索半径 (m) | Y：Jut</div></div>`:''}
+${hasJut?`<div id="${uid}-jk" class="chart-panel"><canvas id="${uid}-jkc" class="cc"></canvas><div class="chart-note">X：搜索半径 | Y：Jut排名（Y轴反转）</div></div>`:''}
+<div id="${uid}-a" class="chart-panel"><div class="chart-leg"><div class="cl-i"><div class="cl-ln" style="background:#60c8ff"></div><span style="color:#2a5a7a">ATS</span></div></div><canvas id="${uid}-ac" class="cc"></canvas><div class="chart-note">X：搜索半径 (m) | Y：ATS</div></div>
+<div id="${uid}-ak" class="chart-panel"><canvas id="${uid}-akc" class="cc"></canvas><div class="chart-note">X：搜索半径 | Y：ATS排名（Y轴反转）</div></div>
+${hasOrs?`<div id="${uid}-o" class="chart-panel"><div class="chart-leg"><div class="cl-i"><div class="cl-ln" style="background:#ff9f40"></div><span style="color:#9b6a24">ORS</span></div></div><canvas id="${uid}-oc" class="cc"></canvas><div class="chart-note">X：搜索半径 (m) | Y：ORS</div></div>`:''}
+${hasOrs?`<div id="${uid}-ok" class="chart-panel"><canvas id="${uid}-okc" class="cc"></canvas><div class="chart-note">X：搜索半径 | Y：ORS排名（Y轴反转）</div></div>`:''}
+`:`<div style="padding:10px 14px;font-size:11px;color:#2a4060;text-align:center">暂无图谱数据</div>`}
+</div>`;
+    if(activePopup) activePopup.remove();
+    activePopup=new maptilersdk.Popup({maxWidth:'520px',closeButton:true,closeOnClick:false,className:'dark-popup'}).setLngLat(coords).setHTML(html).addTo(map);
+    if(hasC) setTimeout(()=>{
+      const atsVals=JSON.parse(p.chart_ats||'[]');
+      const atsRkVals=JSON.parse(p.chart_ats_rk||'[]');
+      const reliefRankRadii = (()=>{ try{ const a=JSON.parse(p.chart_rk_r||'[]'); return Array.isArray(a)&&a.length?a:radii; }catch{return radii;} })();
+      const atsRankRadii = (()=>{ try{ const a=JSON.parse(p.chart_ats_rk_r||'[]'); return Array.isArray(a)&&a.length?a:radii; }catch{return radii;} })();
+      const jutRkVals=hasJut&&jProf.jut_ranks?jProf.jut_ranks:[];
+      const jutRankRadii = (hasJut && Array.isArray(jProf.jut_rank_radii) && jProf.jut_rank_radii.length) ? jProf.jut_rank_radii : (()=>{ try{ const a=JSON.parse(p.chart_jut_rk_r||'[]'); return Array.isArray(a)&&a.length?a:radii; }catch{return radii;} })();
+      const orsRankRadii = (hasOrs && Array.isArray(jProf.ors_rank_radii) && jProf.ors_rank_radii.length) ? jProf.ors_rank_radii : (()=>{ try{ const a=JSON.parse(p.chart_ors_rk_r||'[]'); return Array.isArray(a)&&a.length?a:orsRadii; }catch{return orsRadii;} })();
+      buildCharts(uid,radii,maxRel,meanRl,meanRk,cM,cX,reliefRankRadii);
+      buildAtsChart(uid,radii,atsVals,atsRkVals,atsRankRadii);
+      if(hasJut){ buildJutChart(uid,jProf); buildJutRankChart(uid,jutRankRadii,jutRkVals); }
+      if(hasOrs){ buildOrsChart(uid,orsRadii,orsVals); buildOrsRankChart(uid,orsRankRadii,orsRanks); }
+    },80);
+  };
+})();
+</script>
+
+</body>
+</html>

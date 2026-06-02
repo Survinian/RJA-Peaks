@@ -1,5 +1,9 @@
 *
 !.gitignore
+!README.md
 !index.html
+!index_world.html
 !peaks/
 !peaks/**
+!peaks_world/
+!peaks_world/**

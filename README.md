@@ -1,8 +1,15 @@
-# RJA-Peaks · 北京周边山峰多库综合地图
+# RJA-Peaks · 国内与世界山峰多库综合地图
 
-一个基于 **MapTiler SDK + Google Earth Engine + Python 预处理** 的交互式山峰地形显著度地图。项目整合北京及周边多个山峰数据库，并以多半径 Relief、Jut、ATS 与 ORS 剖面为基础，支持山峰检索、分库显示、距离段筛选、响应半径可视化、弹窗剖面图与总述统计图表。
+RJA-Peaks 是一个基于 **MapTiler SDK + Google Earth Engine + Python 预处理** 的交互式山峰地形显著度地图项目。项目目前包含两条彼此独立、并行维护的数据展示线：
 
-**在线访问：** [https://Survinian.github.io/RJA-Peaks/](https://Survinian.github.io/RJA-Peaks/)
+1. **国内精英库线**：由 `index.html` 与 `peaks/` 驱动，面向北京周边及华北—华中—东北等国内区域精英山峰库。
+2. **世界山峰库线**：由 `index_world.html` 与 `peaks_world/` 驱动，面向全球 Ribus/P1000、各大洲 J 系列库、高亚洲、东南亚、日本、朝鲜半岛、马来西亚等世界山峰库。
+
+两条线在文件、数据目录和前端入口上相互独立，互不覆盖、互不替代。国内线继续保持原有 `index.html + peaks/` 结构；世界线新增 `index_world.html + peaks_world/` 结构。
+
+**国内地图入口：** [https://Survinian.github.io/RJA-Peaks/](https://Survinian.github.io/RJA-Peaks/)
+
+**世界地图入口：** [https://Survinian.github.io/RJA-Peaks/index_world.html](https://Survinian.github.io/RJA-Peaks/index_world.html)
 
 ---
 
@@ -19,85 +26,143 @@
 - **ATS / Absolute Topographic Sharpness / 绝对地形锐度**：由平均突起度与平均高差共同构成，带有长度量纲，用于描述综合锐度。
 - **ORS / Omnidirectional Relief and Steepness / 全向高差-坡度指标**：基于全方向高差与坡度核函数的离散近似积分，用于补充刻画局部强陡峻结构。
 
-本项目当前更适合被理解为一个**地形结构探索工具**，而非严格意义上的山峰美学或视觉感知模型。尤其是，非视点依赖的地形指标不能完全解决“崖底悖论”：局部深谷或崖底的强高差不一定等同于人眼看见一座完整山体时的震撼感。后续若要进一步接近真实观看经验，需要引入视点依赖的天际线模拟与目标峰轮廓识别。
+本项目当前更适合被理解为一个**地形结构探索工具**，而非严格意义上的山峰美学或视觉感知模型。非视点依赖的地形指标不能完全解决“崖底悖论”：局部深谷或崖底的强高差不一定等同于人眼看见一座完整山体时的震撼感。后续若要进一步接近真实观看经验，需要引入视点依赖的天际线模拟与目标峰轮廓识别。
+
+---
+
+## 双线并行结构
+
+```text
+RJA-Peaks/
+├─ index.html                 # 国内精英库地图入口
+├─ peaks/                     # 国内精英库前端数据
+├─ index_world.html           # 世界山峰库地图入口
+├─ peaks_world/               # 世界山峰库前端数据
+├─ README.md
+└─ .gitignore
+```
+
+### 国内线
+
+国内线沿用既有结构：
+
+```text
+index.html
+peaks/
+  output_beijing_geojson/
+  output_bailixi_geojson/
+  output_*_geojson/
+```
+
+该线用于展示北京周边库、百里溪库及国内各区域精英库。它继续使用原有 0–10 km 计算体系与国内版前端逻辑。
+
+### 世界线
+
+世界线新增独立结构：
+
+```text
+index_world.html
+peaks_world/
+  output_ribus_geojson/
+  output_asia_j1000_geojson/
+  output_europe_j1000_geojson/
+  output_north_america_j800_geojson/
+  output_south_america_j800_geojson/
+  output_africa_j250_geojson/
+  output_oceania_j250_geojson/
+  output_antarctica_j250_geojson/
+  output_highasia_e5800_p950_geojson/
+  output_southeast_asia_gb_geojson/
+  output_japan_100peaks_geojson/
+  output_japan_j250_geojson/
+  output_korea_j250_geojson/
+  output_malaysia_prominence_110peaks_geojson/
+```
+
+世界线前端默认加载 **世界Ribus/P1000库**，其余库采用懒加载开关机制。世界线采用 0–34 km 全段统计，因此前端中使用 **34kmORS** 替代国内线的 10kmORS 表述。
 
 ---
 
 ## 数据库说明
 
-### 基础库
+### 国内线基础库
 
 | 库名 | 覆盖范围 | 来源 |
 |---|---|---|
 | 北京周边库 | 北京市域及少量周边区域 | 个人标注 |
 | 百里溪库 | 京津冀 | 前辈 **百里溪** 系列文章，特此致谢 🙏 |
 
-### 精英山峰库
+### 国内线精英山峰库
 
-精英库山峰通过 GEE 与 Python 多步自动筛选生成，覆盖以下区域：
+国内精英库山峰通过 GEE 与 Python 多步自动筛选生成，覆盖北京周边、冀东、宣大、中太行、南太行、燕坝、察哈尔、赤峰、绥朔、吕梁山、汾沁、泰沂、胶东、阴山、潢坝、辽东、秦岭、长白山、伏牛山等区域。
 
-| 库名 | 经度范围 | 纬度范围 | 范围备注 | 标注色 |
-|---|---:|---:|---|---|
-| 北京周边精英库 | 114.5°E–118.0°E | 39.0°N–41.2°N | — | 红 |
-| 冀东精英库 | 118.0°E–121.5°E | 39.0°N–41.2°N | — | 橙 |
-| 宣大精英库 | 113.0°E–114.5°E | 39.0°N–41.2°N | — | 棕 |
-| 中太行精英库 | 113.0°E–114.5°E | 37.0°N–39.0°N | — | 粉红 |
-| 南太行精英库 | 113.0°E–114.5°E | 35.0°N–37.0°N | — | 橙红 |
-| 燕坝精英库 | 114.5°E–118.0°E | 41.2°N–43.2°N | — | 绿 |
-| 察哈尔精英库 | 113.0°E–114.5°E | 41.2°N–43.2°N | — | 深青 |
-| 赤峰精英库 | 118.0°E–122.0°E | 41.2°N–43.2°N | — | 紫灰 |
-| 绥朔精英库 | 111.0°E–113.0°E | 39.0°N–41.2°N | — | 红灰 |
-| 吕梁山精英库 | 111.0°E–113.0°E | 37.0°N–39.0°N | — | 青蓝 |
-| 汾沁精英库 | 110.2°E–113.0°E | 34.7°N–37.0°N | 去除 (110.2°E–110.5°E, 35.0°N–37.0°N) 片区 | 橙灰 |
-| 泰沂精英库 | 116.0°E–119.6°E | 34.8°N–37.0°N | — | 紫 |
-| 胶东精英库 | 119.6°E–122.8°E | 35.5°N–38.5°N | — | 蓝 |
-| 阴山精英库 | 108.5°E–111.0°E | 40.2°N–42.2°N | — | 黄褐 |
-| 潢坝精英库 | 117.0°E–120.0°E | 43.2°N–45.2°N | — | 灰绿 |
-| 辽东精英库 | 121.0°E–124.5°E | 38.5°N–41.8°N | 去除 (121.0°E–122.0°E, 41.2°N–41.8°N) 片区 | 灰蓝 |
-| 秦岭精英库 | 106.0°E–111.0°E | 33.0°N–34.6°N | — | 水绿 |
-| 长白山精英库 | 124.5°E–128.3°E | 40.0°N–43.0°N | 去除中国国境线外地区 | 灰 |
-| 伏牛山精英库 | 111.0°E–114.0°E | 33.0°N–34.7°N | — | 金黄 |
+### 世界线山峰库
+
+| 库名 | 前端 key | 说明 |
+|---|---|---|
+| 世界Ribus/P1000库 | `ribus_p1000` | 全球 Ribus / P1000 级别山峰库，世界线默认唯一加载库。 |
+| 亚洲J1000库 | `asia_j1000` | 亚洲 Jut 高阈值山峰库。 |
+| 欧洲J1000库 | `europe_j1000` | 欧洲 Jut 高阈值山峰库。 |
+| 北美洲J800库 | `north_america_j800` | 北美洲 Jut 高阈值山峰库。 |
+| 南美洲J800库 | `south_america_j800` | 南美洲 Jut 高阈值山峰库。 |
+| 非洲J250库 | `africa_j250` | 非洲 Jut 精选山峰库。 |
+| 大洋洲J250库 | `oceania_j250` | 大洋洲 Jut 精选山峰库。 |
+| 南极洲J250库 | `antarctica_j250` | 南极洲 Jut 精选山峰库；受 Web Mercator 投影限制，极点附近山峰可能无法在普通世界底图中完整显示。 |
+| 高亚洲E5800&P950库 | `highasia_e5800_p950` | 高亚洲 5800m+ 海拔与 950m+ 突起度山峰库。 |
+| 东南亚GB库 | `southeast_asia_gb` | 来源于 Gunung Bagging 体系整理的东南亚山峰库。 |
+| 日本百名山库 | `japan_100peaks` | 日本百名山。 |
+| 日本J250库 | `japan_j250` | 日本 Jut 精选山峰库。 |
+| 朝鲜半岛J250库 | `korea_j250` | 韩国与朝鲜山峰。 |
+| 马来西亚P110库 | `malaysia_prominence_110peaks` | 马来西亚前列突起度山峰库。 |
 
 ---
 
 ## 数据处理工作流
 
+### 国内线流程
+
 ```mermaid
 flowchart TD
-  A[GEE 粗筛山峰<br/>_reliefmap_without_input.js] --> B[Python 生成区域精英库<br/>_generate_regional_elite.py]
-  B --> C1[GEE 计算 Jut / Relief 剖面<br/>_Jutmap.js]
-  B --> C2[GEE 计算 ORS 剖面<br/>_ORSmap.js]
-  C1 --> D[单库衍生指标计算<br/>_topographic_sharpness_statistics.py]
+  A[GEE 粗筛山峰] --> B[Python 生成区域精英库]
+  B --> C1[GEE 计算 Jut / Relief 剖面]
+  B --> C2[GEE 计算 ORS 剖面]
+  C1 --> D[单库衍生指标计算]
   C2 --> D
-  D --> E{是否存在响应半径触及 10 km 上限?}
-  E -- 是 --> F[筛选扩展库<br/>select_truncated_peaks_for_expansion.py]
-  F --> G1[GEE 扩展 Jut / Relief 剖面<br/>_expanded_jutmap.js]
-  F --> G2[GEE 扩展 ORS 剖面<br/>_expanded_ors.js]
-  G1 --> H[合并扩展剖面<br/>merge_expanded_profiles_by_library_batch_aware.py]
+  D --> E{响应半径是否触及 10 km 上限?}
+  E -- 是 --> F[筛选扩展库]
+  F --> G1[GEE 扩展 Jut / Relief 剖面]
+  F --> G2[GEE 扩展 ORS 剖面]
+  G1 --> H[合并扩展剖面]
   G2 --> H
-  H --> I[批量重算衍生指标<br/>_batch_topographic_sharpness_statistics.py]
+  H --> I[批量重算衍生指标]
   E -- 否 --> I
-  I --> J[生成 GeoJSON / JSON<br/>_generate_geojson_via_relief&jut&ors.py]
-  J --> K[前端展示<br/>index.html]
+  I --> J[生成 peaks/ GeoJSON / JSON]
+  J --> K[index.html 前端展示]
 ```
 
-简化步骤说明：
+### 世界线流程
 
-1. 使用 GEE 在研究区内粗筛局部极大值峰点。
-2. 使用 Python 脚本进行命名匹配、重复点清理、机器学习过滤与精英库筛选。
-3. 使用 GEE 分别计算各山峰的 Jut / Relief 剖面与 ORS 剖面。
-4. 使用 `_topographic_sharpness_statistics.py` 计算单库衍生指标与响应半径。
-5. 若 `R_Jmean_peak` 或 `R_ATS_peak` 触及 10 km 上限，则筛选进入扩展库。
-6. 使用 `_expanded_jutmap.js` 与 `_expanded_ors.js` 对扩展库重新计算更大半径剖面。
-7. 合并扩展剖面后，使用 `_batch_topographic_sharpness_statistics.py` 批量重算衍生指标。
-8. 使用 `_generate_geojson_via_relief&jut&ors.py` 汇总为前端可读取的 GeoJSON / JSON。
-9. 前端 `index.html` 负责地图展示、筛选、弹窗、图表与响应半径图层。
+```mermaid
+flowchart TD
+  A[世界山峰原始 CSV / XYZNF] --> B[世界线批处理 pipeline]
+  B --> C1[GEE 计算 0–34 km Jut / Relief 剖面]
+  B --> C2[GEE 计算 0–34 km ORS 剖面]
+  C1 --> D1[world_jut_merger 合并批次]
+  C2 --> D2[world_ors_merger 合并批次]
+  D1 --> E[世界线综合 pipeline]
+  D2 --> E
+  E --> F[名称修复与字段标准化]
+  F --> G[生成 peaks_world/ GeoJSON / JSON]
+  G --> H[index_world.html 前端展示]
+```
+
+世界线与国内线的输入、输出目录相互独立。请不要把世界线输出写入 `peaks/`，也不要把国内线输出写入 `peaks_world/`。
 
 ---
 
 ## 指标体系
 
-所有指标均在多个采样半径 `r` 下独立计算，形成完整径向剖面。默认基础半径范围为 125 m–10,000 m；触及上限的山峰可进入扩展流程，计算至更大半径。
+所有指标均在多个采样半径 `r` 下独立计算，形成完整径向剖面。国内线默认基础半径为 125 m–10,000 m；世界线默认统计至 34,000 m。
 
 ### 1. 基础起伏场
 
@@ -125,10 +190,8 @@ $$J_{max}(r)=\max_{i\in D_r}\frac{(Z_{peak}-Z_i)|Z_{peak}-Z_i|}{\sqrt{(Z_{peak}-
 |---|---|---|---|
 | `CI_Cliff` | 极限绝壁度 CI | $J_{max}/R_{max}$ | 最强局部剖面的陡峭程度，接近 1 时类似垂直断崖。 |
 | `GS_Steepness` | 全局陡峭度 GS | $J_{mean}/R_{max}$ | 平均突起度相对于最大高差的比例，表示整体陡峭性。 |
-| `RF_ReliefFullness` | 高差饱满度 RF | $R_{mean}/R_{max}$ | 平均高差相对于最大高差的充分程度，可视为相对独立性或高差分布均匀性。 |
-| `JF_JutFullness` | 突起饱满度 JF | $J_{mean}/J_{max}$ | 平均突起度相对于最大突起度的充分程度，用于识别突起是否由少数极端点支配。 |
-
-> 旧命名中的 `SL_Slender` 与 `SF_Spire` 已不再作为正式字段使用。新体系中，`RF_ReliefFullness` 更准确地描述 `Rmean/Rmax`，`JF_JutFullness` 更准确地描述 `Jmean/Jmax`。
+| `RF_ReliefFullness` | 高差饱满度 RF | $R_{mean}/R_{max}$ | 平均高差相对于最大高差的充分程度。 |
+| `JF_JutFullness` | 突起饱满度 JF | $J_{mean}/J_{max}$ | 平均突起度相对于最大突起度的充分程度。 |
 
 ### 3. 综合地形锐度
 
@@ -140,25 +203,15 @@ $$FSI(r)=GS(r)\times RF(r)=\frac{J_{mean}(r)R_{mean}(r)}{[R_{max}(r)]^2}$$
 
 $$ATS(r)=FSI(r)\times R_{max}(r)=\frac{J_{mean}(r)R_{mean}(r)}{R_{max}(r)}$$
 
-`ATS` 具有米的量纲。它不是单纯的最大高差指标，而是同时要求平均突起度与平均高差背景较高，并通过 `Rmax` 对单侧深谷或局部极端低值形成一定抑制。因此，高 `ATS` 往往更偏向识别整体独立、面状展开的山峰，而不是只靠一侧深谷制造巨大落差的山峰。
+`ATS` 具有米的量纲。它不是单纯的最大高差指标，而是同时要求平均突起度与平均高差背景较高，并通过 `Rmax` 对单侧深谷或局部极端低值形成一定抑制。
 
 ### 4. 响应半径
-
-本项目将原先容易被误解为“地形边界”的半径统一改称为**响应半径**。它们描述的是某条径向指标曲线的特征尺度，而不是严格山体边界。
 
 | 字段 | 名称 | 公式 | 含义 |
 |---|---|---|---|
 | `R_Jmean_peak` | 平均突起响应半径 | $\arg\max_r J_{mean}(r)$ | 平均突起度达到峰值时的采样半径。 |
 | `R_ATS_peak` | ATS峰值响应半径 | $\arg\max_r ATS(r)$ | ATS 达到峰值时的采样半径。 |
-| `R_ATS_marginal` | ATS最大边际响应半径 | $\arg\max_r \Delta ATS/\Delta r$ | ATS 增速最快的相邻半径区间中点，更接近“综合锐度开始快速展开”的位置。 |
-
-`R_ATS_marginal` 的离散计算方式为：
-
-$$G_{ATS}(k)=\frac{ATS(r_k)-ATS(r_{k-1})}{r_k-r_{k-1}}$$
-
-$$R_{ATS\_marginal}=\frac{r_{k^*}+r_{k^*-1}}{2},\quad k^*=\arg\max_k G_{ATS}(k)$$
-
-为避免极弱山峰因微小数值波动输出无意义半径，当前流程要求最大边际响应区间两端 ATS 绝对值的平均值不低于 1 m；不满足条件时不输出 `R_ATS_marginal`。
+| `R_ATS_marginal` | ATS最大边际响应半径 | $\arg\max_r \Delta ATS/\Delta r$ | ATS 增速最快的相邻半径区间中点。 |
 
 ---
 
@@ -170,22 +223,9 @@ ORS 的理论基础来自 Earl 与 Metzler 提出的全向高差-坡度泛函。
 
 $$ORS_f(p,h_0;h)=\left[\iint_{\mathbb{R}^2} f^2\left(\frac{h_0-h(x)}{r}\right)dA(x)\right]^{1/2}$$
 
-其中，$r=\|x-p\|$。当 $u=(h_0-h(x))/r\le 0$ 时，核函数贡献记为 0。该指标本质上是对“高差 × 坡度”信息的全方向综合。
+其中，$r=\|x-p\|$。当 $u=(h_0-h(x))/r\le 0$ 时，核函数贡献记为 0。
 
-### 工程化实现
-
-由于完整逐像元连续积分计算量极大，本项目采用可批量运行的离散近似：
-
-1. 将 0–10 km 拆分为 48 个同心环带：125–2,000 m 每 125 m 一个环带，2,250–10,000 m 每 250 m 一个环带。
-2. 每个环带采用固定极坐标分层采样：`N_RADIAL = 5`，`N_ANGULAR = 20`，即每环 100 个样点。
-3. 每个样点按环带面积赋权，累计 `kernel_sq × point_weight_m2`，得到 ORS² 增量与累计 ORS。
-4. 采样前投影到 UTM 米制坐标系，避免经纬度距离失真。
-5. 峰顶高程可使用峰点附近 buffer 最大值修正，以降低 DEM 像元错位影响。
-6. 中心设置最小距离阈值，避免 `r → 0` 附近数值爆炸。
-7. 不预先掩膜高于峰点的地形，而是由 ORS 核函数中的 `u.max(0)` 令其贡献为 0。
-8. 通过批量导出控制 GEE 任务规模。
-
-因此，前端中的 `10kmORS`、ORS 分段表现和 ORS 排名应理解为**面向区域大样本比较的离散近似 ORS**，适合排序、筛选和与 Relief / Jut / ATS 互补对照，不应被视为逐像元精确积分真值。
+工程实现采用固定环带与极坐标分层采样：每个环带 `N_RADIAL = 5`、`N_ANGULAR = 20`，即每环 100 个样点。国内线主要使用 10 km ORS；世界线使用 34 km ORS。ORS 结果适合区域比较和前端展示，不应视为逐像元连续积分真值。
 
 ---
 
@@ -198,7 +238,7 @@ $$ORS_f(p,h_0;h)=\left[\iint_{\mathbb{R}^2} f^2\left(\frac{h_0-h(x)}{r}\right)dA
 | `mean_relief_crp` | 多半径平均高差表现。 |
 | `mean_jut_crp` | 多半径平均 Jut 表现。 |
 | `mean_ats_crp` | 多半径平均 ATS 表现。 |
-| `ors_10km_crp` | 10 km ORS 库内表现。 |
+| `ors_10km_crp` / `ors_34km_crp` | 国内线 10 km ORS 或世界线 34 km ORS 表现。 |
 | `max_jut_crp` | 最大 Jut 峰值表现。 |
 | `max_ats_crp` | 最大 ATS 峰值表现。 |
 
@@ -206,87 +246,35 @@ $$ORS_f(p,h_0;h)=\left[\iint_{\mathbb{R}^2} f^2\left(\frac{h_0-h(x)}{r}\right)dA
 
 ---
 
-## 距离段定义
-
-为避免“极短距离 / 长距离”等描述带来主观歧义，当前版本使用明确的半径范围作为距离段名称：
-
-| 距离段字段名 | 采样半径范围 |
-|---|---|
-| `125 m - 500 m` | 125 m–500 m |
-| `625 m - 1250 m` | 625 m–1,250 m |
-| `1375 m - 2000 m` | 1,375 m–2,000 m |
-| `2250 m - 3500 m` | 2,250 m–3,500 m |
-| `3750 m - 5000 m` | 3,750 m–5,000 m |
-| `5250 m - 7000 m` | 5,250 m–7,000 m |
-| `7250 m - 10000 m` | 7,250 m–10,000 m |
-
-前端距离段筛选支持 Relief、Jut、ATS 与 ORS。分段表现通常来自该半径范围内对应指标的均值排名或击败率。
-
----
-
 ## 前端功能
 
 ### 1. 多库叠加与图层控制
 
-左侧面板可独立开关北京周边库、百里溪库和各区域精英库。每个库使用独立色系，点颜色表示库内综合排名百分率。名称标签、点大小、未扩展山峰隐藏、外卡山峰隐藏等显示选项均可实时调整。
+国内线和世界线均支持多库开关、库内综合排名着色、名称标签、当地名称/英文名称切换、点大小调整与总体表现筛选。
 
 ### 2. 山峰检索与定位
 
-前端提供山峰名称模糊搜索。输入山峰名或无名峰编号后，可在候选列表中选择目标山峰，并自动定位到地图对应位置。
+输入山峰名后可在候选列表中选择目标山峰，并自动定位到地图对应位置。
 
 ### 3. 总体表现筛选
 
-可按以下总体表现阈值筛除山峰：
-
-- 高差总体表现
-- 平均 Jut 总体表现
-- ATS 总体表现
-- 10kmORS 表现
-- 最大 Jut 峰值表现
-- 最大 ATS 峰值表现
-
-这些筛选项采用“满足任一条件即显示”的并集逻辑，适合快速寻找某一维度特别突出的山峰。
+可按高差、平均 Jut、ATS、ORS、最大 Jut、最大 ATS 等总体表现阈值筛除山峰。筛选逻辑为“满足任一条件即显示”。
 
 ### 4. 距离段突出筛选
 
-右侧面板支持选择 Relief、Jut、ATS 或 ORS，并勾选一个或多个明确距离段。可设置“排名前 5%–50%”阈值，并选择：
-
-- 任一段满足：只要某个选中距离段突出即显示。
-- 所有段均满足：必须在所有选中距离段都突出才显示。
-
-该功能用于寻找特定尺度上表现突出的山峰，例如“2,250 m - 3,500 m 范围 ATS 特别高”的山峰。
+右侧面板支持选择 Relief、Jut、ATS 或 ORS，并勾选一个或多个明确距离段。可设置“排名前 5%–50%”阈值，并选择任一段满足或所有段均满足。
 
 ### 5. 山峰弹窗
 
-点击山峰后弹窗展示：
-
-- 山名、所属库、海拔、综合击败率
-- 高差、Jut、ATS、ORS 的总体表现
-- 10kmORS、ORS 最佳排名及对应半径
-- 最大 Jut、最大平均 Jut、最大 ATS
-- `R_Jmean_peak`、`R_ATS_peak`、`R_ATS_marginal`
-- Relief / Jut / ATS / ORS 分段击败率条形图
-- Relief / Jut / ATS / ORS 径向曲线与排名变化折线图
+点击山峰后弹窗展示海拔、所属库、综合击败率、峰值指标、响应半径、分段击败率、Relief / Jut / ATS / ORS 径向曲线与排名变化。
 
 ### 6. 响应半径图层
 
-前端提供响应半径图层开关：
-
-- **Base 点**：显示 Jut 最大贡献点。
-- **平均突起响应半径圆**：对应 `R_Jmean_peak`。
-- **ATS峰值响应半径圆**：对应 `R_ATS_peak`。
-- **ATS最大边际响应半径圆**：对应 `R_ATS_marginal`，仅在满足最小 ATS 强度阈值时显示。
-
-三个半径圆可分别控制透明度，用于观察山峰多尺度响应范围。
+可显示 Base 点、平均突起响应半径圆、ATS峰值响应半径圆、ATS最大边际响应半径圆，并分别控制透明度。
 
 ### 7. 总述图表
 
-“总述图表”弹窗支持两类图表模式：
-
-- **分布频率图**：查看所选库在某个全局字段或分段字段上的数值分布。
-- **前 10 名柱状图**：选择库、字段和距离段后，输出对应条件下排名前 10 的山峰。
-
-若选择多个库，前端会将所选库合并后统一排序，并在山名旁标注所属库。若选择分段指标，则会按选中距离段内的指标均值进行排序。
+支持分布频率图与前 10 名柱状图。可选择一个或多个库，对全局字段或距离段字段进行统计与排序。
 
 ### 8. 3D 地形与底图
 
@@ -294,57 +282,84 @@ $$ORS_f(p,h_0;h)=\left[\iint_{\mathbb{R}^2} f^2\left(\frac{h_0-h(x)}{r}\right)dA
 
 ---
 
-## 输出文件结构
+## GitHub Pages 部署说明
+
+本项目为静态网页项目。将以下文件与目录提交到仓库根目录后，即可通过 GitHub Pages 访问：
 
 ```text
-index.html                                  主地图文件
+index.html
 peaks/
-  output_beijing_geojson/                   北京周边库输出
-  output_bailixi_geojson/                   百里溪库输出
-  output_*_geojson/                         各区域精英库输出
+index_world.html
+peaks_world/
+README.md
+.gitignore
 ```
 
-每个 `output_*_geojson` 目录通常包含：
+推荐 `.gitignore` 至少放行以下内容：
 
-| 文件 | 作用 |
-|---|---|
-| `peaks_*.geojson` | 山峰主点层，包含主要属性、总体击败率、分段击败率和径向曲线字段。 |
-| `*_jut_bases.geojson` | Jut 最大贡献点 / Base 点。 |
-| `*_jut_profiles.json` | 各山峰多半径 Jut / Relief 剖面。 |
-| `*_jmean_peak_circles.geojson` | 平均突起响应半径圆。 |
-| `*_ats_peak_circles.geojson` | ATS峰值响应半径圆。 |
-| `*_ats_marginal_circles.geojson` | ATS最大边际响应半径圆。 |
+```gitignore
+*
+!.gitignore
+!README.md
+!index.html
+!index_world.html
+!peaks/
+!peaks/**
+!peaks_world/
+!peaks_world/**
+```
+
+本地预览时不要直接双击 `file:///.../index_world.html` 打开，应使用本地 HTTP 服务：
+
+```powershell
+cd D:\My_Programs\jutman\RJA-Peaks
+python -m http.server 8000
+```
+
+然后访问：
+
+```text
+http://localhost:8000/
+http://localhost:8000/index_world.html
+```
 
 ---
 
-## 主要脚本
+## 上传世界线文件到 GitHub 的建议命令
 
-| 脚本 | 作用 |
-|---|---|
-| `_reliefmap_without_input.js` | 在 GEE 中粗筛候选峰，并计算基础高差统计。 |
-| `_generate_regional_elite.py` | 生成区域精英库，含命名匹配、ML 过滤、双步筛选与外卡通道。 |
-| `_Jutmap.js` | 在 GEE 中计算 0–10 km Jut / Relief 多半径剖面。 |
-| `_ORSmap.js` | 在 GEE 中计算 0–10 km ORS 环带剖面。 |
-| `_topographic_sharpness_statistics.py` | 单库计算 RF、JF、FSI、ATS 与响应半径。 |
-| `select_truncated_peaks_for_expansion.py` | 筛选响应半径触及 10 km 上限、需要扩展计算的山峰。 |
-| `_expanded_jutmap.js` | 在 GEE 中计算扩展半径 Jut / Relief 剖面。 |
-| `_expanded_ors.js` | 在 GEE 中计算扩展半径 ORS 剖面。 |
-| `merge_expanded_profiles_by_library_batch_aware.py` | 将扩展结果按库合并回原始剖面。 |
-| `_batch_topographic_sharpness_statistics.py` | 对所有库批量重算衍生指标。 |
-| `_generate_geojson_via_relief&jut&ors.py` | 汇总 CSV，生成前端 GeoJSON / JSON。 |
-| `_batch_generate_geojson.py` | 批量调用 GeoJSON 生成脚本。 |
-| `index.html` | 前端地图、筛选、弹窗、图表与图层展示。 |
+以下命令假定本地仓库位于 `D:\My_Programs\jutman\RJA-Peaks`，当前世界线输出目录位于 `D:\My_Programs\jutman\peaks_world`，当前世界线前端文件位于 `D:\My_Programs\jutman\index_world.html`。
+
+```powershell
+cd D:\My_Programs\jutman\RJA-Peaks
+
+git pull
+
+# 复制世界线前端与数据目录，不影响 index.html 和 peaks/
+Copy-Item D:\My_Programs\jutman\index_world.html .\index_world.html -Force
+Copy-Item D:\My_Programs\jutman\peaks_world .\peaks_world -Recurse -Force
+
+# 更新 README 和 .gitignore 后提交
+git add index_world.html peaks_world README.md .gitignore
+git commit -m "Add world peaks map alongside domestic map"
+git push origin main
+```
+
+如果默认分支是 `master`，最后一行改为：
+
+```powershell
+git push origin master
+```
 
 ---
 
 ## 方法限制
 
-本项目的核心限制包括：
-
-1. **视点无关性**：Relief、Jut、ATS 与 ORS 主要描述峰点周边地形场，并不等同于真实观察点上的视觉震撼。崖底、深沟或墙状地形可能产生高指标值，但未必对应完整山体感知。
-2. **极值敏感性**：`Rmax`、`Jmax` 及其派生指标可能受到局部深沟、人工坑或 DEM 异常影响。当前通过 DEM 平滑、区块尺度和响应半径诊断降低其影响，但没有完全消除。
-3. **响应半径不是地形边界**：`R_Jmean_peak` 与 `R_ATS_peak` 是指标曲线的峰值响应尺度，不应直接理解为山体真实边界。`R_ATS_marginal` 在理想几何模型中可能更接近边界响应，但在复杂地形中仍可能对应外部结构进入采样圆的半径。
+1. **视点无关性**：Relief、Jut、ATS 与 ORS 主要描述峰点周边地形场，并不等同于真实观察点上的视觉震撼。
+2. **极值敏感性**：`Rmax`、`Jmax` 及其派生指标可能受到局部深沟、人工坑或 DEM 异常影响。
+3. **响应半径不是地形边界**：`R_Jmean_peak` 与 `R_ATS_peak` 是指标曲线的峰值响应尺度，不应直接理解为山体真实边界。
 4. **ORS 为工程化近似**：当前 ORS 使用环带分层采样而非逐像元连续积分，适合区域比较和前端展示，但不是严格数学真值。
+5. **南极显示限制**：普通 Web Mercator 底图无法完整显示南纬约 85° 以南区域，因此南极库极区山峰在 `index_world.html` 中可能无法全部正常拖动查看。
+6. **底图代理依赖**：前端依赖 Cloudflare Workers 代理 MapTiler 请求；若 Worker 或 MapTiler 权限异常，可能出现底图 `403` 或加载失败。
 
 ---
 
@@ -355,9 +370,9 @@ peaks/
 - ORS 理论参考：**Edward Earl & David Metzler**, *A new topographic functional*。
 - 感谢 GitHub 贡献者 Apiaceae 的开源项目 [geocoder](https://github.com/Apiaceae/geocoder)，为部分无名峰真实山名修正提供了数据参考。
 - 感谢高德地图、天地图、两步路、六只脚及各位户外爱好者提供的山峰地名、轨迹与标注点参考。
+- 部分世界山峰列表参考 Worldribus、Peakjut、Peaklist、Gunung Bagging、日本百名山等公开山峰资料整理。
 - 高程数据来源：JAXA ALOS AW3D30 V4.1。
 - 地形计算平台：Google Earth Engine。
 - 地图底图及地形数据：MapTiler。
 - API 代理服务：Cloudflare Workers。
 - AI 辅助理论探索及编程服务：Claude、Gemini、ChatGPT。
-
